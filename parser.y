@@ -185,7 +185,8 @@ Lexpr:            ID
                 ;
 
 Expr:             Term
-                | notOrMinus Term
+                | notTerm Term
+                | minusTerm Term
                 | Term plusTerm
                 | Term multTerm
                 | Term orTerm
@@ -211,9 +212,11 @@ plusTerm:         '+' Term
                 | plusTerm '+' Term
                 ;
 
-notOrMinus:       notOrMinus NOT
-                | notOrMinus '-'
+notTerm:          notTerm NOT
                 | NOT
+                ;
+
+minusTerm:        minusTerm '-'
                 | '-'
                 ;
 
