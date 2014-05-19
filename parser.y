@@ -17,10 +17,14 @@
 @attributes { long value; } NUM
 @attributes { struct symbol_t* symbols; struct symbol_t* structs; } Program
 @attributes { struct symbol_t* structs; } Structdef
-@attributes { struct symbol_t* fields; } StructIds
-@attributes { struct symbol_t* pars; } ids
-@attributes { struct symbol_t* symbols; } Term Lexpr Funcdef Stats Expr exprThenStaEnd orTerm multTerm plusTerm exprs
-@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } Stat idIsExpr
+@attributes	{ struct symbol_t* fields; int offset; } StructIds
+@attributes { struct symbol_t* pars; int num_pars; int all_pars; } ids
+@attributes	{ struct symbol_t* symbols; int defined_vars; } Funcdef
+@attributes	{ struct symbol_t* symbols; int defined_vars; int stack_offset; } Stats
+@attributes	{ struct symbol_t* symbols; treenode* node; int immediate; } Expr Term plusTerm multTerm
+@attributes	{ struct symbol_t* symbols; treenode* node; } Lexpr Bterm orTerm exprs exprThenStaEnd
+@attributes	{ struct symbol_t* iSymbols; struct symbol_t* sSymbols; treenode* node; int defined_vars; int stack_offset; } Stat
+@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
 
 @traversal @postorder check
 @traversal @preorder reg
