@@ -21,9 +21,9 @@
 @attributes { struct symbol_t* pars; int num_pars; int all_pars; } ids
 @attributes { struct symbol_t* symbols; int defined_vars; } Funcdef
 @attributes { struct symbol_t* symbols; int defined_vars; int stack_offset; } Stats exprThenStaEnd
-@attributes { struct symbol_t* symbols; treenode* node; int immediate; } Expr Term plusTerm multTerm
-@attributes { struct symbol_t* symbols; treenode* node; } Lexpr Bterm orTerm exprs
-@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; treenode* node; int defined_vars; int stack_offset; } Stat
+@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr Term plusTerm multTerm
+@attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr Bterm orTerm exprs
+@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
 
 @traversal @postorder check
@@ -265,9 +265,16 @@ Expr:             Term
                   @{ @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.node@); @}
 
                 | Term '>' Term
-                  @{ @i @Expr.node@ = new_node(OP_Greater, @Term.0.node@, @Term.1.node@); @}
+                  @{
+                        @i @Expr.node@ = new_node(OP_Greater, @Term.0.node@, @Term.1.node@);
+                        @i @Expr.immediate@ = 0;
+                  @}
 
                 | Term GENERICS Term
+                  @{
+                        @i @Expr.node@ = new_node(OP_Equal, @Term.node@, @Term.1.node@); /* TODO NOT_equal */
+                        @i @Expr.immediate@ = 0;
+                  @}
                 ;
 
 orTerm:           OR Term
