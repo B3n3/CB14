@@ -59,7 +59,7 @@ Program:          Program Funcdef ';'
 
 Structdef:        STRUCT ID ':' END
                    @{
-                        @i @Structdef.structs@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_STRUCT, 0);
+                        @i @Structdef.structs@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_STRUCT, 0, @Ids.offset@);
                    @}
 
                 | STRUCT ID ':' StructIds END

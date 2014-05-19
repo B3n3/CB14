@@ -15,9 +15,9 @@ struct symbol_t *clone_table(struct symbol_t *table) {
     new_tablex=new_table();
     while(element!=(struct symbol_t *)NULL) {
         if(element->type==SYMBOL_TYPE_STRUCT) {
-            new_tablex=table_add_struct_with_fields(new_tablex,clone_table(element->sublist), NULL, element->identifier,element->type,0);
+            new_tablex=table_add_struct_with_fields(new_tablex,clone_table(element->sublist), NULL, element->identifier, element->type, 0, element->stack_offset);
         } else {
-            new_tablex=table_add_symbol(new_tablex,element->identifier,element->type,0);
+            new_tablex=table_add_symbol(new_tablex,element->identifier,element->type,0, element->stack_offset);
         }
         element=element->next;
     }
@@ -25,11 +25,11 @@ struct symbol_t *clone_table(struct symbol_t *table) {
     return new_tablex;
 }
 
-struct symbol_t *table_add_symbol(struct symbol_t *table, char *identifier, short type, short check) {
-    return table_add_struct_with_fields(table, (struct symbol_t*) NULL, NULL, identifier, type, check);
+struct symbol_t *table_add_symbol(struct symbol_t *table, char *identifier, short type, short check, int stack_offset) {
+    return table_add_struct_with_fields(table, (struct symbol_t*) NULL, NULL, identifier, type, check, stack_offset);
 }
 
-struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct symbol_t* sublist, struct symbol_t* super_table, char *identifier, short type, short check) {
+struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct symbol_t* sublist, struct symbol_t* super_table, char *identifier, short type, short check, int stack_offset) {
 
     struct symbol_t *element;
     struct symbol_t *new_element;
@@ -58,6 +58,8 @@ struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct sym
     new_element->next=(struct symbol_t *)NULL;
     new_element->identifier=strdup(identifier);
     new_element->type=type;
+    new_element->stack_offset=stack_offset;
+    new_element->param_index=-1;
 
     if(sublist != (struct symbol_t*)NULL) {
         struct symbol_t *sub_element;
@@ -65,7 +67,7 @@ struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct sym
 
         sub_element=sublist;
         while(sub_element!=(struct symbol_t *)NULL) {
-            new_sublist=table_add_struct_with_fields(new_sublist, NULL, table, sub_element->identifier,SYMBOL_TYPE_FIELD,check);
+            new_sublist=table_add_struct_with_fields(new_sublist, NULL, table, sub_element->identifier,SYMBOL_TYPE_FIELD,check, sub_element->stack_offset);
             sub_element=sub_element->next;
         }
         new_element->sublist = new_sublist;
@@ -83,6 +85,34 @@ struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct sym
 
     element->next=new_element;
 
+
+    return table;
+}
+
+struct symbol_t *table_add_param(struct symbol_t *table, char *identifier, int param_index) {
+    struct symbol_t *element;
+    struct symbol_t *new_element;
+
+    if(table_lookup(table,identifier)!=(struct symbol_t *)NULL) {
+        table=table_remove_symbol(table,identifier);
+    }
+
+    new_element=(struct symbol_t *)malloc(sizeof(struct symbol_t));
+    new_element->next=(struct symbol_t *)NULL;
+    new_element->identifier=strdup(identifier);
+    new_element->type=SYMBOL_TYPE_PARAM;
+    new_element->param_index=param_index;
+
+    if((struct symbol_t *)NULL==table) {
+        return new_element;
+    }
+    element=table;
+
+    while((struct symbol_t *)NULL!=element->next) {
+        element=element->next;
+    }
+
+    element->next=new_element;
 
     return table;
 }
@@ -145,9 +175,9 @@ struct symbol_t *table_merge(struct symbol_t *table, struct symbol_t *to_add, sh
     element=to_add;
     while(element!=(struct symbol_t *)NULL) {
         if(element->type==SYMBOL_TYPE_STRUCT) {
-            new_table=table_add_struct_with_fields(new_table,element->sublist, NULL, element->identifier,element->type,check);
+            new_table=table_add_struct_with_fields(new_table,element->sublist, NULL, element->identifier,element->type,check, element->stack_offset);
         } else {
-            new_table=table_add_symbol(new_table,element->identifier,element->type,check);
+            new_table=table_add_symbol(new_table,element->identifier,element->type,check, element->stack_offset);
         }
         element=element->next;
     }
@@ -161,7 +191,7 @@ struct symbol_t *table_merge_as_type(struct symbol_t *table, struct symbol_t *to
 
     element=to_add;
     while(element!=(struct symbol_t *)NULL) {
-        new_table=table_add_symbol(new_table,element->identifier,type,check);
+        new_table=table_add_symbol(new_table,element->identifier,type,check, element->stack_offset);
         element=element->next;
     }
 
@@ -203,8 +233,8 @@ struct symbol_t *table_remove_symbol(struct symbol_t *table, char *identifier) {
 void check_variable(struct symbol_t *table, char *identifier) {
     struct symbol_t *element=table_lookup(table,identifier);
     if(element!=(struct symbol_t *)NULL) {
-        if(element->type!=SYMBOL_TYPE_VAR) {
-            fprintf(stderr,"Identifier %s not a variable.\n",identifier);
+        if(element->type!=SYMBOL_TYPE_VAR && element->type!=SYMBOL_TYPE_PARAM) {
+            fprintf(stderr,"Identifier %s not a variable or parameter.\n",identifier);
             exit(3);
         }
     }
