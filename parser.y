@@ -71,12 +71,12 @@ Structdef:        STRUCT ID ':' END
                 ;
 StructIds:        ID
                    @{
-                        @i @StructIds.fields@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, @StructIds.offset@); /* TODO FIELD or VAR?!?  0 or 1 ???? */
+                        @i @StructIds.fields@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, @StructIds.offset@);
                    @}
 
                 | StructIds ID
                    @{
-                        @i @StructIds.0.fields@ = table_add_symbol(@StructIds.1.fields@, @ID.name@, SYMBOL_TYPE_VAR, 1, @StructIds.offset@); /* TODO FIELD or VAR?!? */
+                        @i @StructIds.0.fields@ = table_add_symbol(@StructIds.1.fields@, @ID.name@, SYMBOL_TYPE_VAR, 1, @StructIds.offset@);
                         @i @StructIds.1.offset@ = @StructIds.offset@ + 1;
                    @}
                 ;
@@ -334,9 +334,10 @@ Term:             '(' Expr ')'
 
                 | ID
                   @{
-                        @check check_variable(@Term.symbols@, @ID.name@);
                         @i @Term.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->stack_offset, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->param_index);
                         @i @Term.immediate@ = 0;
+
+                        @check check_variable(@Term.symbols@, @ID.name@);
                   @}
 
                 | ID '(' ')'
