@@ -22,6 +22,9 @@
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } Stat idIsExpr
 
 @traversal @postorder t
+@traversal @postorder check
+@traversal @preorder reg
+@traversal @postorder codegen
 
 %%
 
@@ -186,12 +189,18 @@ Expr:             Term
                 | Term plusTerm
                 | Term multTerm
                 | Term orTerm
+                  @{ @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.node@); @}
+
                 | Term '>' Term
+                  @{ @i @Expr.node@ = new_node(OP_Greater, @Term.0.node@, @Term.1.node@); @}
+
                 | Term GENERICS Term
                 ;
 
 orTerm:           OR Term
                 | orTerm OR Term
+                  @{ @i @orTerm.0.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.1.node@); @}
+
                 ;
 
 multTerm:        '*' Term
@@ -211,7 +220,12 @@ notOrMinus:       notOrMinus NOT
 Term:             '(' Expr ')'
                 | NUM
                 | Term '.' ID
-                  @{ @t check_field(@Term.symbols@, @ID.name@); @}
+                  @{
+                        @t check_field(@Term.symbols@, @ID.name@);
+                        @i @Term.0.node@ = new_node_value(OP_Field, @Term.1.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup(@Term.0.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup(@Term.0.symbols@, @ID.name@)->stack_offset, -1);
+                        @t check_field(@Term.symbols@, @ID.name@);
+                        @reg @Term.1.node@->reg = @Term.0.node@->reg; @Term.0.node@->kids[1]->reg = get_next_reg(@Term.0.node@->reg, 0);
+                  @}
 
                 | ID
                   @{ @t check_variable(@Term.symbols@, @ID.name@); @}
