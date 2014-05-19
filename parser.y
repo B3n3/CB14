@@ -72,7 +72,6 @@ Structdef:        STRUCT ID ':' END
 StructIds:        ID
                    @{
                         @i @StructIds.fields@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, @StructIds.offset@); /* TODO FIELD or VAR?!?  0 or 1 ???? */
-                        @i @StructIds.1.offset@ = 1;
                    @}
 
                 | StructIds ID
@@ -111,7 +110,7 @@ ids:              ID
 
                 | ids ID
                    @{
-                        @i @ds.pars@ = table_add_param(@ids.1.pars@, @ID.name@, @ids.num_pars@);
+                        @i @ids.pars@ = table_add_param(@ids.1.pars@, @ID.name@, @ids.num_pars@);
                         @i @ids.num_pars@ = @ids.1.num_pars@ + 1;
                    @}
                 ;
@@ -127,6 +126,7 @@ Stats:            Stats Stat ';'
                    @}
 
                 |
+                  @{ @i @Stats.defined_vars@ = 0; @}
                 ;
 
 Stat:             RETURN Expr
@@ -142,18 +142,21 @@ Stat:             RETURN Expr
                 | COND END
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
+                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 | COND exprThenStaEnd END
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @exprThenStaEnd.symbols@ = @Stat.iSymbols@;
+                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 | LET IN Stats END
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = @Stat.iSymbols@;
+                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 | LET idIsExpr IN Stats END
@@ -161,6 +164,7 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @idIsExpr.iSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = table_merge(@Stat.iSymbols@, @idIsExpr.sSymbols@, 1);
+                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 | WITH Expr ':' ID DO Stats END
@@ -168,6 +172,7 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Expr.symbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = table_merge_as_type(@Stat.iSymbols@, table_check_lookup_struct_sublist(@Stat.iSymbols@, @ID.name@), SYMBOL_TYPE_VAR, 1);
+                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 | Lexpr '=' Expr
@@ -177,12 +182,14 @@ Stat:             RETURN Expr
                         @i @Expr.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = (treenode *)NULL;
                         @i @Stat.defined_vars@ = 0;
+                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 | Term
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Term.symbols@ = @Stat.iSymbols@;
+                        @i @Stat.node = NULL; /* TODO */
                    @}
 
                 ;
