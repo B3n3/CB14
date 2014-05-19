@@ -17,13 +17,13 @@
 @attributes { long value; } NUM
 @attributes { struct symbol_t* symbols; struct symbol_t* structs; } Program
 @attributes { struct symbol_t* structs; } Structdef
-@attributes	{ struct symbol_t* fields; int offset; } StructIds
+@attributes { struct symbol_t* fields; int offset; } StructIds
 @attributes { struct symbol_t* pars; int num_pars; int all_pars; } ids
-@attributes	{ struct symbol_t* symbols; int defined_vars; } Funcdef
-@attributes	{ struct symbol_t* symbols; int defined_vars; int stack_offset; } Stats
-@attributes	{ struct symbol_t* symbols; treenode* node; int immediate; } Expr Term plusTerm multTerm
-@attributes	{ struct symbol_t* symbols; treenode* node; } Lexpr Bterm orTerm exprs exprThenStaEnd
-@attributes	{ struct symbol_t* iSymbols; struct symbol_t* sSymbols; treenode* node; int defined_vars; int stack_offset; } Stat
+@attributes { struct symbol_t* symbols; int defined_vars; } Funcdef
+@attributes { struct symbol_t* symbols; int defined_vars; int stack_offset; } Stats exprThenStaEnd
+@attributes { struct symbol_t* symbols; treenode* node; int immediate; } Expr Term plusTerm multTerm
+@attributes { struct symbol_t* symbols; treenode* node; } Lexpr Bterm orTerm exprs
+@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; treenode* node; int defined_vars; int stack_offset; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
 
 @traversal @postorder check
@@ -143,6 +143,7 @@ Stat:             RETURN Expr
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = NULL; /* TODO */
+                        @i @Stat.defined_vars@ = 0; /* TODO */
                    @}
 
                 | COND exprThenStaEnd END
@@ -150,6 +151,7 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @exprThenStaEnd.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = NULL; /* TODO */
+                        @i @Stat.defined_vars@ = 0; /* TODO */
                    @}
 
                 | LET IN Stats END
@@ -157,6 +159,7 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = NULL; /* TODO */
+                        @i @Stat.defined_vars@ = 0; /* TODO */
                    @}
 
                 | LET idIsExpr IN Stats END
@@ -165,6 +168,7 @@ Stat:             RETURN Expr
                         @i @idIsExpr.iSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = table_merge(@Stat.iSymbols@, @idIsExpr.sSymbols@, 1);
                         @i @Stat.node@ = NULL; /* TODO */
+                        @i @Stat.defined_vars@ = 0; /* TODO */
                    @}
 
                 | WITH Expr ':' ID DO Stats END
@@ -173,6 +177,7 @@ Stat:             RETURN Expr
                         @i @Expr.symbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = table_merge_as_type(@Stat.iSymbols@, table_check_lookup_struct_sublist(@Stat.iSymbols@, @ID.name@), SYMBOL_TYPE_VAR, 1);
                         @i @Stat.node@ = NULL; /* TODO */
+                        @i @Stat.defined_vars@ = 0; /* TODO */
                    @}
 
                 | Lexpr '=' Expr
@@ -182,14 +187,14 @@ Stat:             RETURN Expr
                         @i @Expr.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = (treenode *)NULL;
                         @i @Stat.defined_vars@ = 0;
-                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 | Term
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Term.symbols@ = @Stat.iSymbols@;
-                        @i @Stat.node = NULL; /* TODO */
+                        @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.node@ = NULL; /* TODO */
                    @}
 
                 ;
@@ -199,6 +204,7 @@ idIsExpr:         ID '=' Expr ';'
                         @i @Expr.symbols@ = @idIsExpr.iSymbols@;
                         @i @idIsExpr.sSymbols@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0);
                  @}
+
                 | idIsExpr ID '=' Expr ';'
                  @{
                         @i @Expr.symbols@ = @idIsExpr.iSymbols@;
@@ -208,7 +214,15 @@ idIsExpr:         ID '=' Expr ';'
                 ;
 
 exprThenStaEnd:   Expr THEN Stats END ';'
+                 @{
+                        @i @exprThenStaEnd.defined_vars@ = 0; /* TODO */
+                 @}
+
                 | exprThenStaEnd Expr THEN Stats END ';'
+                 @{
+                        @i @exprThenStaEnd.defined_vars@ = 0; /* TODO */
+                 @}
+
                 ;
 
 Lexpr:            ID
@@ -234,7 +248,19 @@ Expr:             Term
                   @}
 
                 | Term plusTerm
+                  @{
+                        @i @Expr.node@ = new_node(OP_Addition, @plusTerm.node@, @Term.node@);
+                        @i @Expr.immediate@ = @Term.immediate@ && @plusTerm.immediate@;
+                        @reg if(!@plusTerm.immediate@) { @plusTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@plusTerm.node@->reg, @Expr.node@->skip_reg); @plusTerm.node@->skip_reg = 1; } else { @Term.node@->reg = @Expr.node@->reg; @plusTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
+                  @}
+
                 | Term multTerm
+                  @{
+                        @i @Expr.node@ = new_node(OP_Multiplication, @multTerm.node@, @Term.node@);
+                        @i @Expr.immediate@ = @Term.immediate@ && @multTerm.immediate@;
+                        @reg if(!@multTerm.immediate@) { @multTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@multTerm.node@->reg, @Expr.node@->skip_reg); @multTerm.node@->skip_reg = 1; } else { @Term.node@-> reg = @Expr.node@->reg; @multTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
+                  @}
+
                 | Term orTerm
                   @{ @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.node@); @}
 
@@ -251,7 +277,7 @@ orTerm:           OR Term
                 ;
 
 multTerm:        '*' Term
-		          @{ @reg @Term.node@->reg = @multTerm.node@->reg; @}
+                  @{ @reg @Term.node@->reg = @multTerm.node@->reg; @}
 
                 | multTerm '*' Term
                   @{
@@ -283,7 +309,7 @@ minusTerm:        minusTerm '-'
                 ;
 
 Term:             '(' Expr ')'
-		          @{ @reg @Expr.node@->reg = @Term.node@->reg; @}
+                  @{ @reg @Expr.node@->reg = @Term.node@->reg; @}
 
                 | NUM
                   @{
