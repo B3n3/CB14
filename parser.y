@@ -10,7 +10,8 @@
 %start          Input
 %token          STRUCT END FUNC RETURN WITH DO LET IN COND THEN NOT OR ID NUM GENERICS
 
-@autoinh symbols
+@autoinh symbols stack_offset all_pars
+@autosyn node defined_vars immediate
 
 @attributes { char *name; } ID
 @attributes { long value; } NUM
@@ -21,7 +22,6 @@
 @attributes { struct symbol_t* symbols; } Term Lexpr Funcdef Stats Expr exprThenStaEnd orTerm multTerm plusTerm exprs
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } Stat idIsExpr
 
-@traversal @postorder t
 @traversal @postorder check
 @traversal @preorder reg
 @traversal @postorder codegen
@@ -31,6 +31,7 @@
 Input:            Program
                    @{
                         @i @Program.symbols@ = @Program.structs@;
+                        @codegen @revorder(1) printf("\t.text\n");
                    @}
 
 Program:          Program Funcdef ';'
@@ -60,17 +61,20 @@ Structdef:        STRUCT ID ':' END
                 | STRUCT ID ':' StructIds END
                    @{
                         @i @Structdef.structs@ = table_add_struct_with_fields(new_table(), @StructIds.fields@, NULL, @ID.name@, SYMBOL_TYPE_STRUCT, 1);
+                        @i @StructIds.offset@ = 0;
                    @}
 
                 ;
 StructIds:        ID
                    @{
-                        @i @StructIds.fields@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0);
+                        @i @StructIds.fields@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, @StructIds.offset@); /* TODO FIELD or VAR?!?  0 or 1 ???? */
+                        @i @StructIds.1.offset@ = 1;
                    @}
 
                 | StructIds ID
                    @{
-                        @i @StructIds.0.fields@ = table_add_symbol(@StructIds.1.fields@, @ID.name@, SYMBOL_TYPE_VAR, 1);
+                        @i @StructIds.0.fields@ = table_add_symbol(@StructIds.1.fields@, @ID.name@, SYMBOL_TYPE_VAR, 1, @StructIds.offset@); /* TODO FIELD or VAR?!? */
+                        @i @StructIds.1.offset@ = @StructIds.offset@ + 1;
                    @}
                 ;
 
@@ -78,11 +82,18 @@ StructIds:        ID
 Funcdef:          FUNC ID '(' ')' Stats END
                    @{
                         @i @Stats.symbols@ = @Funcdef.symbols@;
+                        @i @Stats.stack_offset@ = 0;
+
+                        @codegen @revorder(1) function_header(@ID.name@);
                    @}
 
                 | FUNC ID '(' ids ')' Stats END
                    @{
                         @i @Stats.symbols@ = table_merge(@Funcdef.symbols@, @ids.pars@, 0);
+                        @i @Stats.stack_offset@ = 0;
+                        @i @ids.all_pars@ = @ids.num_pars@;
+
+                        @codegen @revorder(1) function_header(@ID.name@);
                    @}
 
                 ;
@@ -90,12 +101,14 @@ Funcdef:          FUNC ID '(' ')' Stats END
 
 ids:              ID
                    @{
-                        @i @ids.pars@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0);
+                        @i @ids.pars@ = table_add_param(new_table(), @ID.name@, 1);
+                        @i @ids.num_pars@ = 1;
                    @}
 
                 | ids ID
                    @{
-                        @i @ids.pars@ = table_add_symbol(@ids.1.pars@, @ID.name@, SYMBOL_TYPE_VAR, 1);
+                        @i @ds.pars@ = table_add_param(@ids.1.pars@, @ID.name@, @ids.num_pars@);
+                        @i @ids.num_pars@ = @ids.1.num_pars@ + 1;
                    @}
                 ;
 
@@ -103,6 +116,10 @@ Stats:            Stats Stat ';'
                    @{
                         @i @Stat.iSymbols@ = @Stats.symbols@;
                         @i @Stats.1.symbols@ = @Stat.sSymbols@;
+                        @i @Stats.defined_vars@ = @Stat.defined_vars@ + @Stats.1.defined_vars@;
+                        @i @Stats.1.stack_offset@ = @Stats.stack_offset@ + @Stat.defined_vars@ * 8;
+
+                        @codegen /* write_tree(@Stat.node@, 0); */ burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);
                    @}
 
                 |
@@ -112,6 +129,10 @@ Stat:             RETURN Expr
                    @{
                         @i @Expr.symbols@ = @Stat.iSymbols@;
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
+                        @i @Stat.node@ = new_node(OP_Return, @Expr.node@, (treenode *)NULL);
+
+                        @reg @Stat.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = @Stat.node@->reg;
+                        @i @Stat.defined_vars@ = 0;
                    @}
 
                 | COND END
@@ -150,6 +171,8 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Lexpr.symbols@ = @Stat.iSymbols@;
                         @i @Expr.symbols@ = @Stat.iSymbols@;
+                        @i @Stat.node@ = (treenode *)NULL;
+                        @i @Stat.defined_vars@ = 0;
                    @}
 
                 | Term
@@ -184,7 +207,7 @@ Lexpr:            ID
                   @}
 
                 | Term '.' ID
-                     @{ @t check_field(@Lexpr.symbols@, @ID.name@); @}
+                     @{ @check check_field(@Lexpr.symbols@, @ID.name@); @}
                 ;
 
 Expr:             Term
@@ -259,9 +282,8 @@ Term:             '(' Expr ')'
 
                 | Term '.' ID
                   @{
-                        @t check_field(@Term.symbols@, @ID.name@);
                         @i @Term.0.node@ = new_node_value(OP_Field, @Term.1.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup(@Term.0.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup(@Term.0.symbols@, @ID.name@)->stack_offset, -1);
-                        @t check_field(@Term.symbols@, @ID.name@);
+                        @check check_field(@Term.symbols@, @ID.name@);
                         @reg @Term.1.node@->reg = @Term.0.node@->reg; @Term.0.node@->kids[1]->reg = get_next_reg(@Term.0.node@->reg, 0);
                         @i @Term.0.immediate@ = 0;
                   @}
