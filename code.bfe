@@ -1,0 +1,67 @@
+%{
+/* vim: filetype=c
+ */
+#define CODE
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+
+#include "tree.h"
+#include "code_gen.h"
+
+/* TODO (-a)+b */
+/* TODO func f(a,a) return a; end; shall do the same as func f(b,a) return a; end; */
+%}
+
+%start stat
+%term OP_Not=1 OP_Negation=2 OP_Addition=3 OP_Multiplication=4 OP_Disjunction=5 OP_Greater=6 OP_Equal=7 OP_ID=8 OP_Number=9 OP_Field=10 OP_Return=11 OP_Zero=12 OP_One=13 OP_Exprs=14 OP_Call=15
+
+%%
+
+stat:	ret					# 0 #
+
+ret:	OP_Return(expr)				# 1 # move(bnode->reg, "rax"); ret(); 
+
+expr:	OP_ID					# 1 # if(bnode->param_index!=-1) move(get_param_reg(bnode->param_index), bnode->reg);
+expr:	imm					# 1 # printf("\tmovq $%li, %%%s\n", bnode->value, bnode->reg);
+expr:	call					# 0 #
+expr:	OP_Negation(expr)			# 1 # printf("\tnegq %%%s\n", bnode->reg);
+expr:	OP_Addition(expr,expr)			# 1 # printf("\taddq %%%s, %%%s\n", bnode->kids[1]->reg, bnode->kids[0]->reg);
+expr:	OP_Addition(imm,expr)			# 1 # printf("\taddq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg); move(bnode->kids[1]->reg, bnode->reg);
+expr:	OP_Addition(expr,imm)			# 1 # if(bnode->kids[0]->op=OP_ID) { move(bnode->kids[0]->reg, bnode->reg); printf("\taddq $%li, %%%s\n", bnode->kids[1]->value, bnode->reg); } else { printf("\tadd $%li, %%%s\n", bnode->kids[1]->value, bnode->kids[0]->reg); }
+expr:	OP_Multiplication(expr,expr)		# 1 # printf("\timulq %%%s, %%%s\n", bnode->kids[1]->reg, bnode->kids[0]->reg);
+expr:	OP_Multiplication(imm,expr)		# 1 # printf("\timulq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg); move(bnode->kids[1]->reg, bnode->reg);
+expr:	OP_Multiplication(expr,imm)		# 1 # if(bnode->kids[0]->op=OP_ID) { move(bnode->kids[0]->reg, bnode->reg); printf("\timulq $%li, %%%s\n", bnode->kids[1]->value, bnode->reg); } else { printf("\tadd $%li, %%%s\n", bnode->kids[1]->value, bnode->kids[0]->reg); }
+expr:	OP_Field(expr,OP_ID)			# 2 # printf("\tmovq %li(%%%s), %%%s\n", 8*bnode->value, bnode->kids[0]->reg, bnode->reg);
+expr:	OP_Field(imm,OP_ID)			# 1 # printf("\tmovq %li, %%%s\n", bnode->kids[0]->value+bnode->value*8, bnode->reg);
+
+call:	OP_Call(OP_ID,exprs)			# 0 # /* ignore at the moment */
+
+exprs:	expr					# 0 #
+exprs:	OP_Exprs(exprs,expr)			# 0 #
+
+zero:	OP_Negation(zero)			# 0 #
+zero:	OP_Zero					# 0 #
+zero:	OP_Multiplication(zexpr,zero)		# 0 #
+zero:	OP_Multiplication(zero,zexpr)		# 0 #
+
+zexpr:	zero					# 0 #
+zexpr:	imm					# 0 #
+zexpr:	OP_Negation(zexpr)			# 0 #
+zexpr:	OP_Addition(zexpr,zexpr)		# 0 #
+zexpr:	OP_Multiplication(zexpr,zexpr)		# 0 #
+zexpr:	OP_Field(zexpr,OP_ID)			# 0 #
+zexpr:	OP_ID					# 0 #
+
+imm:	zero					# 0 #
+imm:	OP_Negation(imm)			# 0 # bnode->value=-bnode->kids[0]->value;
+imm:	OP_Addition(imm,imm)			# 0 # bnode->value=bnode->kids[0]->value+bnode->kids[1]->value;
+imm:	OP_Multiplication(imm,imm)		# 0 # bnode->value=bnode->kids[0]->value*bnode->kids[1]->value;
+imm:	OP_Number				# 0 # 
+imm:	OP_Zero					# 0 # 
+imm:	OP_One					# 0 # 
+
+%%
+
+
