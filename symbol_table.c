@@ -176,7 +176,9 @@ struct symbol_t *table_merge(struct symbol_t *table, struct symbol_t *to_add, sh
     while(element!=(struct symbol_t *)NULL) {
         if(element->type==SYMBOL_TYPE_STRUCT) {
             new_table=table_add_struct_with_fields(new_table,element->sublist, NULL, element->identifier,element->type,check, element->stack_offset);
-        } else {
+        } else if(element->param_index!=-1) {
+			new_table=table_add_param(new_table,element->identifier,element->param_index);
+		} else {
             new_table=table_add_symbol(new_table,element->identifier,element->type,check, element->stack_offset);
         }
         element=element->next;
