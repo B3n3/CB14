@@ -3,6 +3,8 @@
         #include <stdio.h>
         #include <string.h>
         #include "symbol_table.h"
+        #include "code_gen.h"
+        #include "tree.h"
 %}
 
 %start          Input
@@ -11,6 +13,7 @@
 @autoinh symbols
 
 @attributes { char *name; } ID
+@attributes { long value; } NUM
 @attributes { struct symbol_t* symbols; struct symbol_t* structs; } Program
 @attributes { struct symbol_t* structs; } Structdef
 @attributes { struct symbol_t* fields; } StructIds
@@ -214,13 +217,22 @@ Term:             '(' Expr ')'
                   @{ @t check_variable(@Term.symbols@, @ID.name@); @}
 
                 | ID '(' ')'
+                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), NULL); @}
+
                 | ID '(' Expr ')'
+                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @Expr.node@); @}
+
                 | ID '(' exprs ')'
+                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @exprs.node@); @}
+
                 | ID '(' exprs Expr ')'
+                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), new_node(OP_Exprs, @exprs.node@, @Expr.node@)); @}
+
                 ;
 
 exprs:            Expr ','
                 | exprs Expr ','
+                  @{ @i @exprs.node@ = new_node(OP_Exprs, @exprs.1.node@, @Expr.node@); @}
                 ;
 %%
 
