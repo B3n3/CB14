@@ -59,12 +59,12 @@ Program:          Program Funcdef ';'
 
 Structdef:        STRUCT ID ':' END
                    @{
-                        @i @Structdef.structs@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_STRUCT, 0, @Ids.offset@);
+                        @i @Structdef.structs@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_STRUCT, 0, 0);
                    @}
 
                 | STRUCT ID ':' StructIds END
                    @{
-                        @i @Structdef.structs@ = table_add_struct_with_fields(new_table(), @StructIds.fields@, NULL, @ID.name@, SYMBOL_TYPE_STRUCT, 1);
+                        @i @Structdef.structs@ = table_add_struct_with_fields(new_table(), @StructIds.fields@, NULL, @ID.name@, SYMBOL_TYPE_STRUCT, 1, @StructIds.offset@);
                         @i @StructIds.offset@ = 0;
                    @}
 
@@ -202,14 +202,14 @@ Stat:             RETURN Expr
 idIsExpr:         ID '=' Expr ';'
                  @{
                         @i @Expr.symbols@ = @idIsExpr.iSymbols@;
-                        @i @idIsExpr.sSymbols@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0);
+                        @i @idIsExpr.sSymbols@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, 0);
                  @}
 
                 | idIsExpr ID '=' Expr ';'
                  @{
                         @i @Expr.symbols@ = @idIsExpr.iSymbols@;
                         @i @idIsExpr.1.iSymbols@ = @idIsExpr.0.iSymbols@;
-                        @i @idIsExpr.0.sSymbols@ = table_add_symbol(@idIsExpr.1.sSymbols@, @ID.name@, SYMBOL_TYPE_VAR, 1);
+                        @i @idIsExpr.0.sSymbols@ = table_add_symbol(@idIsExpr.1.sSymbols@, @ID.name@, SYMBOL_TYPE_VAR, 1, 0);
                  @}
                 ;
 
