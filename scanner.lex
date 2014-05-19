@@ -40,8 +40,8 @@ or                              return(OR);
 
 {IDENTIFIER}                    return(ID); @{ @ID.name@=strdup(yytext); @}
 
-{DEC_NUM}                       return(NUM);
-{HEX_NUM}                       return(NUM);
+{DEC_NUM}                       return(NUM); @{ @NUM.value@=strtol(yytext,(char **)NULL,10); @}
+{HEX_NUM}                       return(NUM); @{ yytext[strlen(yytext)-1]='\0'; @NUM.value@=strtol(yytext,(char **)NULL,16); @}
 
 \<>                             return(GENERICS);
 \:                              return(':');
