@@ -178,15 +178,27 @@ exprThenStaEnd:   Expr THEN Stats END ';'
                 ;
 
 Lexpr:            ID
-                     @{ @t check_variable(@Lexpr.symbols@, @ID.name@); @}
+                  @{
+                        @i @Lexpr.node@ = (treenode *)NULL;
+                        @check check_variable(@Lexpr.symbols@, @ID.name@);
+                  @}
 
                 | Term '.' ID
                      @{ @t check_field(@Lexpr.symbols@, @ID.name@); @}
                 ;
 
 Expr:             Term
+                  @{ @reg @Term.node@->reg = @Expr.node@->reg; @}
+
                 | notTerm Term
+                  @{ @i @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); @}
+
                 | minusTerm Term
+                  @{
+                        @i @Expr.node@ = new_node(OP_Negation, @Term.node@, (treenode *)NULL);
+                        @reg @Term.node@->reg = @Expr.node@->reg;
+                  @}
+
                 | Term plusTerm
                 | Term multTerm
                 | Term orTerm
@@ -205,11 +217,27 @@ orTerm:           OR Term
                 ;
 
 multTerm:        '*' Term
+		          @{ @reg @Term.node@->reg = @multTerm.node@->reg; @}
+
                 | multTerm '*' Term
+                  @{
+                        @i @multTerm.0.node@ = new_node(OP_Multiplication, @multTerm.1.node@, @Term.node@);
+                        @i @multTerm.0.immediate@ = @Term.immediate@ && @multTerm.1.immediate@;
+                        @reg @multTerm.1.node@->reg = @multTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@multTerm.1.node@->reg, @multTerm.0.node@->skip_reg);
+                  @}
+
                 ;
 
 plusTerm:         '+' Term
+                  @{ @reg @Term.node@->reg = @plusTerm.node@->reg; @}
+
                 | plusTerm '+' Term
+                  @{
+                        @i @plusTerm.0.node@ = new_node(OP_Addition, @plusTerm.1.node@, @Term.node@);
+                        @i @plusTerm.0.immediate@ = @Term.immediate@ && @plusTerm.1.immediate@;
+                        @reg @plusTerm.1.node@->reg = @plusTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@plusTerm.1.node@->reg, @plusTerm.0.node@->skip_reg);
+                  @}
+
                 ;
 
 notTerm:          notTerm NOT
@@ -221,29 +249,53 @@ minusTerm:        minusTerm '-'
                 ;
 
 Term:             '(' Expr ')'
+		          @{ @reg @Expr.node@->reg = @Term.node@->reg; @}
+
                 | NUM
+                  @{
+                        @i @Term.node@ = new_number_leaf(@NUM.value@);
+                        @i @Term.immediate@ = 1;
+                  @}
+
                 | Term '.' ID
                   @{
                         @t check_field(@Term.symbols@, @ID.name@);
                         @i @Term.0.node@ = new_node_value(OP_Field, @Term.1.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup(@Term.0.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup(@Term.0.symbols@, @ID.name@)->stack_offset, -1);
                         @t check_field(@Term.symbols@, @ID.name@);
                         @reg @Term.1.node@->reg = @Term.0.node@->reg; @Term.0.node@->kids[1]->reg = get_next_reg(@Term.0.node@->reg, 0);
+                        @i @Term.0.immediate@ = 0;
                   @}
 
                 | ID
-                  @{ @t check_variable(@Term.symbols@, @ID.name@); @}
+                  @{
+                        @check check_variable(@Term.symbols@, @ID.name@);
+                        @i @Term.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->stack_offset, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->param_index);
+                        @i @Term.immediate@ = 0;
+                  @}
 
                 | ID '(' ')'
-                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), NULL); @}
+                  @{
+                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), NULL);
+                        @i @Term.0.immediate@ = 0;
+                  @}
 
                 | ID '(' Expr ')'
-                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @Expr.node@); @}
+                  @{
+                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @Expr.node@);
+                        @i @Term.0.immediate@ = 0;
+                  @}
 
                 | ID '(' exprs ')'
-                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @exprs.node@); @}
+                  @{
+                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @exprs.node@);
+                        @i @Term.0.immediate@ = 0;
+                  @}
 
                 | ID '(' exprs Expr ')'
-                  @{ @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), new_node(OP_Exprs, @exprs.node@, @Expr.node@)); @}
+                  @{
+                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), new_node(OP_Exprs, @exprs.node@, @Expr.node@));
+                        @i @Term.0.immediate@ = 0;
+                  @}
 
                 ;
 
