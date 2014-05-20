@@ -34,7 +34,9 @@ expr:   OP_NotEqual(expr,imm)               # 1 # printf("\tcmpq $%li, %%%s\n", 
 expr:   OP_Greater(expr,expr)               # 1 # printf("\tcmpq %%%s, %%%s\n", bnode->kids[1]->reg, bnode->kids[0]->reg); printf("\tsetg  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
 expr:   OP_Greater(imm,expr)                # 1 # printf("\tcmpq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg); printf("\tsetg  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
 expr:   OP_Greater(expr,imm)                # 1 # printf("\tcmpq $%li, %%%s\n", bnode->kids[1]->value, bnode->kids[0]->reg); printf("\tsetg  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
-
+expr:   OP_Disjunction(expr,expr)           # 1 # printf("\torq %%%s, %%%s\n", bnode->kids[0]->reg, bnode->kids[1]->reg);
+expr:   OP_Disjunction(imm,expr)            # 1 # printf("\torq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg);
+expr:   OP_Disjunction(expr,imm)            # 1 # printf("\torq $%li, %%%s\n", bnode->kids[1]->value, bnode->kids[0]->reg);
 
 expr:   OP_Addition(expr,expr)              # 1 # printf("\taddq %%%s, %%%s\n", bnode->kids[1]->reg, bnode->kids[0]->reg);
 expr:   OP_Addition(imm,expr)               # 1 # printf("\taddq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg); move(bnode->kids[1]->reg, bnode->reg);

@@ -271,6 +271,7 @@ Expr:             Term
                   @{
                         @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.node@);
                         @i @Expr.immediate@ = 0;
+                        @reg if(!@orTerm.immediate@) { @orTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@orTerm.node@->reg, @Expr.node@->skip_reg); @orTerm.node@->skip_reg = 1; } else { @Term.node@->reg = @Expr.node@->reg; @orTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
                   @}
 
                 | Term '>' Term
