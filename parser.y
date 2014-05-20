@@ -241,9 +241,8 @@ Expr:             Term
 
                 | notTerm Term
                   @{
-                        /* @e Expr.node : notTerm.toggle Term.node;
-                           if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); } */ /* TODO  not not == nothing */
-                        @i @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL);
+                        @e Expr.node : notTerm.toggle Term.node;
+                           if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); } else { @Expr.node@ = new_node(OP_Nop, @Term.node@, (treenode*)NULL); }
                         @reg @Term.node@->reg = @Expr.node@->reg;
                   @}
 
