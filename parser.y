@@ -21,8 +21,8 @@
 @attributes { struct symbol_t* pars; int num_pars; int all_pars; } ids
 @attributes { struct symbol_t* symbols; int defined_vars; } Funcdef
 @attributes { struct symbol_t* symbols; int defined_vars; int stack_offset; } Stats exprThenStaEnd
-@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr Term plusTerm multTerm
-@attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr Bterm orTerm exprs
+@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr Term plusTerm multTerm orTerm
+@attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr Bterm exprs
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
 @attributes { int toggle; } notTerm
@@ -241,8 +241,10 @@ Expr:             Term
 
                 | notTerm Term
                   @{
-                        /* @reg  if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); } */
-                        @reg  if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); }
+                        /* @e Expr.node : notTerm.toggle Term.node;
+                           if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); } */ /* TODO  not not == nothing */
+                        @i @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL);
+                        @reg @Term.node@->reg = @Expr.node@->reg;
                   @}
 
                 | minusTerm Term
@@ -266,7 +268,10 @@ Expr:             Term
                   @}
 
                 | Term orTerm
-                  @{ @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.node@); @}
+                  @{
+                        @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.node@);
+                        @i @Expr.immediate@ = 0;
+                  @}
 
                 | Term '>' Term
                   @{
@@ -286,8 +291,14 @@ Expr:             Term
                 ;
 
 orTerm:           OR Term
+                  @{ @reg @Term.node@->reg = @orTerm.node@->reg; @}
+
                 | orTerm OR Term
-                  @{ @i @orTerm.0.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.1.node@); @}
+                  @{
+                        @i @orTerm.0.node@ = new_node(OP_Disjunction, @orTerm.1.node@, @Term.node@);
+                        @i @orTerm.0.immediate@ = @Term.immediate@ && @orTerm.1.immediate@;
+                        @reg @orTerm.1.node@->reg = @orTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@orTerm.1.node@->reg, @orTerm.0.node@->skip_reg);
+                  @}
 
                 ;
 
