@@ -241,6 +241,7 @@ Expr:             Term
 
                 | notTerm Term
                   @{
+                        /* @reg  if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); } */
                         @reg  if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); }
                   @}
 
@@ -269,14 +270,18 @@ Expr:             Term
 
                 | Term '>' Term
                   @{
-                        @i @Expr.node@ = new_node(OP_Greater, @Term.0.node@, @Term.1.node@);
+                        @i @Expr.node@ = new_node(OP_Greater, @Term.node@, @Term.1.node@);
                         @i @Expr.immediate@ = 0;
+                        @reg @Term.node@->reg = get_next_reg(@Expr.node@->reg, 0);
+                        @reg @Term.1.node@->reg = get_next_reg(@Term.node@->reg, 0);
                   @}
 
                 | Term GENERICS Term
                   @{
-                        @i @Expr.node@ = new_node(OP_Equal, @Term.node@, @Term.1.node@); /* TODO NOT_equal */
+                        @i @Expr.node@ = new_node(OP_NotEqual, @Term.node@, @Term.1.node@);
                         @i @Expr.immediate@ = 0;
+                        @reg @Term.node@->reg = get_next_reg(@Expr.node@->reg, 0);
+                        @reg @Term.1.node@->reg = get_next_reg(@Term.node@->reg, 0);
                   @}
                 ;
 

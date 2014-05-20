@@ -15,7 +15,7 @@
 %}
 
 %start stat
-%term OP_Not=1 OP_Negation=2 OP_Addition=3 OP_Multiplication=4 OP_Disjunction=5 OP_Greater=6 OP_Equal=7 OP_ID=8 OP_Number=9 OP_Field=10 OP_Return=11 OP_Zero=12 OP_One=13 OP_Exprs=14 OP_Call=15
+%term OP_Not=1 OP_Negation=2 OP_Addition=3 OP_Multiplication=4 OP_Disjunction=5 OP_Greater=6 OP_Equal=7 OP_ID=8 OP_Number=9 OP_Field=10 OP_Return=11 OP_Zero=12 OP_One=13 OP_Exprs=14 OP_Call=15 OP_NotEqual=16
 
 %%
 
@@ -28,6 +28,14 @@ expr:   imm                                 # 1 # printf("\tmovq $%li, %%%s\n", 
 expr:   call                                # 0 #
 expr:   OP_Negation(expr)                   # 1 # printf("\tnegq %%%s\n", bnode->reg);
 expr:   OP_Not(expr)                        # 1 # printf("\tnotq %%%s\n", bnode->reg);
+expr:   OP_NotEqual(expr,expr)              # 1 # printf("\tcmpq %%%s, %%%s\n", bnode->kids[1]->reg, bnode->kids[0]->reg); printf("\tsetne  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
+expr:   OP_NotEqual(imm,expr)               # 1 # printf("\tcmpq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg); printf("\tsetne  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
+expr:   OP_NotEqual(expr,imm)               # 1 # printf("\tcmpq $%li, %%%s\n", bnode->kids[1]->value, bnode->kids[0]->reg); printf("\tsetne  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
+expr:   OP_Greater(expr,expr)               # 1 # printf("\tcmpq %%%s, %%%s\n", bnode->kids[1]->reg, bnode->kids[0]->reg); printf("\tsetg  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
+expr:   OP_Greater(imm,expr)                # 1 # printf("\tcmpq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg); printf("\tsetg  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
+expr:   OP_Greater(expr,imm)                # 1 # printf("\tcmpq $%li, %%%s\n", bnode->kids[1]->value, bnode->kids[0]->reg); printf("\tsetg  %%al\n"); printf("\tmovzbq %%al, %%%s\n", bnode->reg); printf("\tnegq %%%s\n", bnode->reg);
+
+
 expr:   OP_Addition(expr,expr)              # 1 # printf("\taddq %%%s, %%%s\n", bnode->kids[1]->reg, bnode->kids[0]->reg);
 expr:   OP_Addition(imm,expr)               # 1 # printf("\taddq $%li, %%%s\n", bnode->kids[0]->value, bnode->kids[1]->reg); move(bnode->kids[1]->reg, bnode->reg);
 expr:   OP_Addition(expr,imm)               # 1 # if(bnode->kids[0]->op=OP_ID) { move(bnode->kids[0]->reg, bnode->reg); printf("\taddq $%li, %%%s\n", bnode->kids[1]->value, bnode->reg); } else { printf("\tadd $%li, %%%s\n", bnode->kids[1]->value, bnode->kids[0]->reg); }

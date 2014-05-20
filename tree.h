@@ -2,7 +2,7 @@
 #define __TREE_H_
 
 #ifndef CODE
-typedef struct burm_state *STATEPTR_TYPE; 
+typedef struct burm_state *STATEPTR_TYPE;
 #endif
 
 enum {
@@ -20,7 +20,8 @@ enum {
 	OP_Zero,
 	OP_One,
 	OP_Exprs,
-	OP_Call
+	OP_Call,
+	OP_NotEqual
 };
 
 static char rule_names[100][100]={
@@ -39,9 +40,10 @@ static char rule_names[100][100]={
 	"OP_Zero",
 	"OP_One",
 	"OP_Exprs",
-	"OP_Call"
+	"OP_Call",
+	"OP_NotEqual"
 };
-	  
+
 
 /* struct for the tree build by ox for iburg */
 typedef struct treenode {
