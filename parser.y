@@ -25,6 +25,7 @@
 @attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr Bterm orTerm exprs
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
+@attributes { int toggle; } notTerm
 
 @traversal @postorder check
 @traversal @preorder reg
@@ -74,7 +75,7 @@ StructIds:        ID
                         @i @StructIds.fields@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, @StructIds.offset@);
                    @}
 
-                | StructIds ID
+                | ID StructIds
                    @{
                         @i @StructIds.0.fields@ = table_add_symbol(@StructIds.1.fields@, @ID.name@, SYMBOL_TYPE_VAR, 1, @StructIds.offset@);
                         @i @StructIds.1.offset@ = @StructIds.offset@ + 1;
@@ -239,7 +240,9 @@ Expr:             Term
                   @{ @reg @Term.node@->reg = @Expr.node@->reg; @}
 
                 | notTerm Term
-                  @{ @i @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); @}
+                  @{
+                        @reg  if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); }
+                  @}
 
                 | minusTerm Term
                   @{
@@ -308,7 +311,15 @@ plusTerm:         '+' Term
                 ;
 
 notTerm:          notTerm NOT
+                  @{
+                        @i @notTerm.toggle@ = @notTerm.1.toggle@ * (-1);
+                  @}
+
                 | NOT
+                  @{
+                        @i @notTerm.toggle@ = 1;
+                  @}
+
                 ;
 
 minusTerm:        minusTerm '-'
@@ -326,7 +337,7 @@ Term:             '(' Expr ')'
 
                 | Term '.' ID
                   @{
-                        @i @Term.0.node@ = new_node_value(OP_Field, @Term.1.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup(@Term.0.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup(@Term.0.symbols@, @ID.name@)->stack_offset, -1);
+                        @i @Term.0.node@ = new_node_value(OP_Field, @Term.1.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup_sublists(@Term.0.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup_sublists(@Term.0.symbols@, @ID.name@)->stack_offset, -1);
                         @check check_field(@Term.symbols@, @ID.name@);
                         @reg @Term.1.node@->reg = @Term.0.node@->reg; @Term.0.node@->kids[1]->reg = get_next_reg(@Term.0.node@->reg, 0);
                         @i @Term.0.immediate@ = 0;
