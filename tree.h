@@ -6,27 +6,28 @@ typedef struct burm_state *STATEPTR_TYPE;
 #endif
 
 enum {
-	OP_Not=1,
-	OP_Negation,
-	OP_Addition,
-	OP_Multiplication,
-	OP_Disjunction,
-	OP_Greater,
-	OP_Equal,
-	OP_ID,
-	OP_Number,
-	OP_Field,
-	OP_Return,
-	OP_Zero,
-	OP_One,
-	OP_Exprs,
-	OP_Call,
-	OP_NotEqual,
-    OP_Nop
+    OP_Not=1,
+    OP_Negation,
+    OP_Addition,
+    OP_Multiplication,
+    OP_Disjunction,
+    OP_Greater,
+    OP_Equal,
+    OP_ID,
+    OP_Number,
+    OP_Field,
+    OP_Return,
+    OP_Zero,
+    OP_One,
+    OP_Exprs,
+    OP_Call,
+    OP_NotEqual,
+    OP_Nop,
+    OP_MinusNot
 };
 
 static char rule_names[100][100]={
-	"",
+    "",
         "OP_Not",
         "OP_Negation",
         "OP_Addition",
@@ -37,38 +38,39 @@ static char rule_names[100][100]={
         "OP_ID",
         "OP_Number",
         "OP_Field",
-	"OP_Return",
-	"OP_Zero",
-	"OP_One",
-	"OP_Exprs",
-	"OP_Call",
-	"OP_NotEqual",
-    "OP_Nop"
+    "OP_Return",
+    "OP_Zero",
+    "OP_One",
+    "OP_Exprs",
+    "OP_Call",
+    "OP_NotEqual",
+    "OP_Nop",
+    "OP_MinusNot"
 };
 
 
 /* struct for the tree build by ox for iburg */
 typedef struct treenode {
-	int op;
-	struct treenode *kids[2];
-	STATEPTR_TYPE label;
-	char *name;
-	long value;
-	char *reg;
-	struct treenode *parent;
-	int skip_reg;
-	int param_index; /* -1 if not a parameter */
+    int op;
+    struct treenode *kids[2];
+    STATEPTR_TYPE label;
+    char *name;
+    long value;
+    char *reg;
+    struct treenode *parent;
+    int skip_reg;
+    int param_index; /* -1 if not a parameter */
 } treenode;
 
 typedef treenode *treenodep;
 
 /* macros for iburg being able to traverse the tree */
-#define NODEPTR_TYPE    	treenodep
-#define OP_LABEL(p)     	((p)->op)
-#define LEFT_CHILD(p)   	((p)->kids[0])
-#define RIGHT_CHILD(p)  	((p)->kids[1])
-#define STATE_LABEL(p)  	((p)->label)
-#define PANIC			printf
+#define NODEPTR_TYPE        treenodep
+#define OP_LABEL(p)         ((p)->op)
+#define LEFT_CHILD(p)       ((p)->kids[0])
+#define RIGHT_CHILD(p)      ((p)->kids[1])
+#define STATE_LABEL(p)      ((p)->label)
+#define PANIC           printf
 
 /* see tree.c for description about these procedures */
 treenode *new_node(int op, treenode *left, treenode *right);

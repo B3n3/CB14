@@ -25,7 +25,7 @@
 @attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr Bterm exprs
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
-@attributes { int toggle; } notTerm
+@attributes { int toggleNot; int toggleMinus; } notTerm
 
 @traversal @postorder check
 @traversal @preorder reg
@@ -241,14 +241,12 @@ Expr:             Term
 
                 | notTerm Term
                   @{
-                        @e Expr.node : notTerm.toggle Term.node;
-                           if(@notTerm.toggle@ > 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode *)NULL); } else { @Expr.node@ = new_node(OP_Nop, @Term.node@, (treenode*)NULL); }
-                        @reg @Term.node@->reg = @Expr.node@->reg;
-                  @}
+                        @e Expr.node : notTerm.toggleNot notTerm.toggleMinus Term.node;
+                           if(@notTerm.toggleNot@ > 0 && @notTerm.toggleMinus@ > 0) { @Expr.node@ = new_node(OP_MinusNot, @Term.node@, (treenode*)NULL); }
+                           else if(@notTerm.toggleNot@ < 0 && @notTerm.toggleMinus@ > 0) { @Expr.node@ = new_node(OP_Negation, @Term.node@, (treenode*)NULL); }
+                           else if(@notTerm.toggleNot@ > 0 && @notTerm.toggleMinus@ < 0) { @Expr.node@ = new_node(OP_Not, @Term.node@, (treenode*)NULL); }
+                           else { @Expr.node@ = new_node(OP_Nop, @Term.node@, (treenode*)NULL); }
 
-                | minusTerm Term
-                  @{
-                        @i @Expr.node@ = new_node(OP_Negation, @Term.node@, (treenode *)NULL);
                         @reg @Term.node@->reg = @Expr.node@->reg;
                   @}
 
@@ -328,18 +326,28 @@ plusTerm:         '+' Term
 
 notTerm:          notTerm NOT
                   @{
-                        @i @notTerm.toggle@ = @notTerm.1.toggle@ * (-1);
+                        @i @notTerm.toggleNot@ = @notTerm.1.toggleNot@ * (-1);
+                        @i @notTerm.toggleMinus@ = @notTerm.1.toggleMinus@;
+                  @}
+
+                | notTerm '-'
+                  @{
+                        @i @notTerm.toggleNot@ = @notTerm.1.toggleNot@;
+                        @i @notTerm.toggleMinus@ = @notTerm.1.toggleMinus@ * (-1);
                   @}
 
                 | NOT
                   @{
-                        @i @notTerm.toggle@ = 1;
+                        @i @notTerm.toggleNot@ = 1;
+                        @i @notTerm.toggleMinus@ = -1;
                   @}
 
-                ;
-
-minusTerm:        minusTerm '-'
                 | '-'
+                  @{
+                        @i @notTerm.toggleNot@ = -1;
+                        @i @notTerm.toggleMinus@ = 1;
+                  @}
+
                 ;
 
 Term:             '(' Expr ')'
