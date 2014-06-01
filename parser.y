@@ -186,8 +186,11 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Lexpr.symbols@ = @Stat.iSymbols@;
                         @i @Expr.symbols@ = @Stat.iSymbols@;
-                        @i @Stat.node@ = (treenode *)NULL;
+                        @i @Stat.node@ = new_node(OP_Assign, @Lexpr.node@, @Expr.node@);
                         @i @Stat.defined_vars@ = 0;
+
+                        @reg @Lexpr.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = get_next_reg(@Lexpr.node@->reg, 0); @Stat.node@->reg = @Expr.node@->reg;
+                        /* @codegen @@@!!! write_tree(@Stat.node@, 0); @@@!!!  burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);  */
                    @}
 
                 | Term
@@ -195,7 +198,8 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Term.symbols@ = @Stat.iSymbols@;
                         @i @Stat.defined_vars@ = 0; /* TODO */
-                        @i @Stat.node@ = NULL; /* TODO */
+                        /*@i @Stat.node@ = new_node(OP_Nop, (treenode*)NULL, (treenode*)NULL); */
+                        @i @Stat.node@ = new_leaf(OP_NopEmpty);
                    @}
 
                 ;
@@ -228,12 +232,16 @@ exprThenStaEnd:   Expr THEN Stats END ';'
 
 Lexpr:            ID
                   @{
-                        @i @Lexpr.node@ = (treenode *)NULL;
+                        @i @Lexpr.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->stack_offset, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->param_index);
                         @check check_variable(@Lexpr.symbols@, @ID.name@);
                   @}
 
                 | Term '.' ID
-                     @{ @check check_field(@Lexpr.symbols@, @ID.name@); @}
+                   @{
+                        @i @Lexpr.node@ = new_node_value(OP_Field, @Term.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup(@Lexpr.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->stack_offset, -1);
+                        @check check_field(@Lexpr.symbols@, @ID.name@);
+                        @reg @Term.node@->reg = @Lexpr.node@->reg; @Lexpr.node@->kids[1]->reg = get_next_reg(@Lexpr.node@->reg, 0);
+                   @}
                 ;
 
 Expr:             Term
