@@ -89,11 +89,15 @@ struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct sym
     return table;
 }
 
-struct symbol_t *table_add_param(struct symbol_t *table, char *identifier, int param_index) {
+struct symbol_t *table_add_param(struct symbol_t *table, char *identifier, int param_index, short check) {
     struct symbol_t *element;
     struct symbol_t *new_element;
 
     if(table_lookup(table,identifier)!=(struct symbol_t *)NULL) {
+        if(check) {
+            fprintf(stderr,"Duplicate var %s.\n",identifier);
+            exit(3);
+        }
         table=table_remove_symbol(table,identifier);
     }
 
@@ -177,7 +181,7 @@ struct symbol_t *table_merge(struct symbol_t *table, struct symbol_t *to_add, sh
         if(element->type==SYMBOL_TYPE_STRUCT) {
             new_table=table_add_struct_with_fields(new_table,element->sublist, NULL, element->identifier,element->type,check, element->stack_offset);
         } else if(element->param_index!=-1) {
-			new_table=table_add_param(new_table,element->identifier,element->param_index);
+			new_table=table_add_param(new_table,element->identifier,element->param_index, check);
 		} else {
             new_table=table_add_symbol(new_table,element->identifier,element->type,check, element->stack_offset);
         }

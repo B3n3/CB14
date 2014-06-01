@@ -105,13 +105,13 @@ Funcdef:          FUNC ID '(' ')' Stats END
 
 ids:              ID
                    @{
-                        @i @ids.pars@ = table_add_param(new_table(), @ID.name@, 1);
+                        @i @ids.pars@ = table_add_param(new_table(), @ID.name@, 1, 0);
                         @i @ids.num_pars@ = 1;
                    @}
 
                 | ids ID
                    @{
-                        @i @ids.pars@ = table_add_param(@ids.1.pars@, @ID.name@, @ids.num_pars@);
+                        @i @ids.pars@ = table_add_param(@ids.1.pars@, @ID.name@, @ids.num_pars@, 1);
                         @i @ids.num_pars@ = @ids.1.num_pars@ + 1;
                    @}
                 ;
