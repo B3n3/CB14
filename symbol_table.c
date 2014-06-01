@@ -17,7 +17,12 @@ struct symbol_t *clone_table(struct symbol_t *table) {
         if(element->type==SYMBOL_TYPE_STRUCT) {
             new_tablex=table_add_struct_with_fields(new_tablex,clone_table(element->sublist), NULL, element->identifier, element->type, 0, element->stack_offset);
         } else {
-            new_tablex=table_add_symbol(new_tablex,element->identifier,element->type,0, element->stack_offset);
+           if(element->param_index!=-1) {
+               new_tablex=table_add_param(new_tablex,element->identifier,element->param_index, 0);
+           }
+           else {
+               new_tablex=table_add_symbol(new_tablex,element->identifier,element->type,0,element->stack_offset);
+           }
         }
         element=element->next;
     }

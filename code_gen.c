@@ -2,8 +2,14 @@
 #include <string.h>
 #include "code_gen.h"
 
-void function_header(char *name) {
+int variables;
+
+void function_header(char *name, int vars) {
+	variables = vars;
 	printf("\t.globl %s\n\t.type %s, @function\n%s:\n", name, name, name);
+	if(vars>0) {
+		printf("\tpushq %%rbp\n\tmovq %%rsp, %%rbp\n\tsubq $%i, %%rsp\n", 8*vars);
+	}
 }
 
 char *get_next_reg(char *name, int skip_reg) {
@@ -32,6 +38,9 @@ char *get_param_reg(long number) {
 }
 
 void ret(void) {
+	if(variables>0) {
+		printf("\tleave\n");
+	}
 	printf("\tret\n");
 }
 

@@ -10,20 +10,21 @@
 %start          Input
 %token          STRUCT END FUNC RETURN WITH DO LET IN COND THEN NOT OR ID NUM GENERICS
 
-@autoinh symbols stack_offset all_pars
-@autosyn node defined_vars immediate
+@autoinh symbols stack_offset all_pars if_in
+@autosyn node defined_vars immediate if_out
 
 @attributes { char *name; } ID
 @attributes { long value; } NUM
-@attributes { struct symbol_t* symbols; struct symbol_t* structs; } Program
+@attributes { struct symbol_t* symbols; struct symbol_t* structs; int if_in; } Program
 @attributes { struct symbol_t* structs; } Structdef
 @attributes { struct symbol_t* fields; int offset; } StructIds
 @attributes { struct symbol_t* pars; int num_pars; int all_pars; } ids
-@attributes { struct symbol_t* symbols; int defined_vars; } Funcdef
-@attributes { struct symbol_t* symbols; int defined_vars; int stack_offset; } Stats exprThenStaEnd
-@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr Term plusTerm multTerm orTerm
-@attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr Bterm exprs
-@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } Stat
+@attributes { struct symbol_t* symbols; int defined_vars; int if_in; int if_out; } Funcdef
+@attributes { struct symbol_t* symbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stats exprThenStaEnd
+@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Term plusTerm multTerm orTerm
+@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr
+@attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr exprs
+@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
 @attributes { int toggleNot; int toggleMinus; } notTerm
 
@@ -36,12 +37,15 @@
 Input:            Program
                    @{
                         @i @Program.symbols@ = @Program.structs@;
+                        @i @Program.if_in@ = 0;
+
                         @codegen @revorder(1) printf("\t.text\n");
                    @}
 
 Program:          Program Funcdef ';'
                    @{
                         @i @Program.0.structs@ = @Program.1.structs@;
+                        @i @Program.1.if_in@ = @Funcdef.if_out@;
                    @}
 
                 | Program Structdef ';'
@@ -88,7 +92,7 @@ Funcdef:          FUNC ID '(' ')' Stats END
                         @i @Stats.symbols@ = @Funcdef.symbols@;
                         @i @Stats.stack_offset@ = 0;
 
-                        @codegen @revorder(1) function_header(@ID.name@);
+                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@);
                    @}
 
                 | FUNC ID '(' ids ')' Stats END
@@ -97,7 +101,7 @@ Funcdef:          FUNC ID '(' ')' Stats END
                         @i @Stats.stack_offset@ = 0;
                         @i @ids.all_pars@ = @ids.num_pars@;
 
-                        @codegen @revorder(1) function_header(@ID.name@);
+                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@);
                    @}
 
                 ;
@@ -122,12 +126,20 @@ Stats:            Stats Stat ';'
                         @i @Stats.1.symbols@ = @Stat.sSymbols@;
                         @i @Stats.defined_vars@ = @Stat.defined_vars@ + @Stats.1.defined_vars@;
                         @i @Stats.1.stack_offset@ = @Stats.stack_offset@ + @Stat.defined_vars@ * 8;
+                        @i @Stats.node@ = new_node(OP_Stats, @Stat.node@, @Stats.1.node@);
+                        @i @Stat.if_in@ = @Stats.if_in@;
+                        @i @Stats.1.if_in@ = @Stat.if_out@;
+                        @i @Stats.if_out@ = @Stats.1.if_out@;
 
-                        @codegen /* write_tree(@Stat.node@, 0); */ burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);
+                     /*   @codegen @@@@@ write_tree(@Stat.node@, 0); @@@@@ burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1); */
                    @}
 
                 |
-                  @{ @i @Stats.defined_vars@ = 0; @}
+                   @{
+                        @i @Stats.node@ = new_leaf(OP_NopEmpty); /* TODO */
+                        @i @Stats.defined_vars@ = 0;
+                        @i @Stats.if_out@ = @Stats.if_in@;
+                   @}
                 ;
 
 Stat:             RETURN Expr
@@ -135,9 +147,10 @@ Stat:             RETURN Expr
                         @i @Expr.symbols@ = @Stat.iSymbols@;
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = new_node(OP_Return, @Expr.node@, (treenode *)NULL);
+                        @i @Stat.defined_vars@ = 0;
+                        @i @Stat.if_out@ = @Stat.if_in@;
 
                         @reg @Stat.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = @Stat.node@->reg;
-                        @i @Stat.defined_vars@ = 0;
                    @}
 
                 | COND END
@@ -188,6 +201,7 @@ Stat:             RETURN Expr
                         @i @Expr.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = new_node(OP_Assign, @Lexpr.node@, @Expr.node@);
                         @i @Stat.defined_vars@ = 0;
+                        @i @Stat.if_out@ = @Stat.if_in@;
 
                         @reg @Lexpr.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = get_next_reg(@Lexpr.node@->reg, 0); @Stat.node@->reg = @Expr.node@->reg;
                         /* @codegen @@@!!! write_tree(@Stat.node@, 0); @@@!!!  burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);  */
@@ -221,6 +235,18 @@ idIsExpr:         ID '=' Expr ';'
 exprThenStaEnd:   Expr THEN Stats END ';'
                  @{
                         @i @exprThenStaEnd.defined_vars@ = 0; /* TODO */
+
+                        @i @Expr.symbols@ = @exprThenStaEnd.in_symbols@;
+                        @i @Stats.symbols@ = @exprThenStaEnd.in_symbols@;
+                        @i @exprThenStaEnd.out_symbols@ = @exprThenStaEnd.in_symbols@;
+                        @i @exprThenStaEnd.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
+                        @i @Stats.if_in@ = @exprThenStaEnd.if_in@ + 1;
+                        @i @exprThenStaEnd.if_out@ = @Stats.if_out@;
+                        @e Expr.jump_true : Stats.if_in; @Expr.jump_true@ = malloc(100); sprintf(@Expr.jump_true@, "if_then%i", @Stats.if_in@);
+                        @e Expr.jump_false : Stats.if_in; @Expr.jump_false@ = malloc(100); sprintf(@Expr.jump_false@, "if_end%i", @Stats.if_in@);
+
+                        @reg @Expr.node@->reg = get_next_reg((char *)NULL, 0);
+                        @codegen @revorder(1) printf("if_end%i:\n", @Stats.if_in@);
                  @}
 
                 | exprThenStaEnd Expr THEN Stats END ';'

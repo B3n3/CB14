@@ -15,7 +15,7 @@
 %}
 
 %start stat
-%term OP_Not=1 OP_Negation=2 OP_Addition=3 OP_Multiplication=4 OP_Disjunction=5 OP_Greater=6 OP_Equal=7 OP_ID=8 OP_Number=9 OP_Field=10 OP_Return=11 OP_Zero=12 OP_One=13 OP_Exprs=14 OP_Call=15 OP_NotEqual=16 OP_Nop=17 OP_MinusNot=18 OP_Assign=19 OP_NopEmpty=20
+%term OP_Not=1 OP_Negation=2 OP_Addition=3 OP_Multiplication=4 OP_Disjunction=5 OP_Greater=6 OP_Equal=7 OP_ID=8 OP_Number=9 OP_Field=10 OP_Return=11 OP_Zero=12 OP_One=13 OP_Exprs=14 OP_Call=15 OP_NotEqual=16 OP_Nop=17 OP_MinusNot=18 OP_Assign=19 OP_NopEmpty=20 OP_If=21 OP_Stats=22
 
 %%
 
