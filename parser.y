@@ -25,7 +25,7 @@
 @attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr
 @attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr exprs
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stat
-@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; } idIsExpr
+@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } idIsExpr
 @attributes { int toggleNot; int toggleMinus; } notTerm
 
 @traversal @postorder check
@@ -176,7 +176,7 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = NULL; /* TODO */
-                        @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.defined_vars@ = 0;
                         @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
@@ -186,7 +186,7 @@ Stat:             RETURN Expr
                         @i @idIsExpr.iSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = table_merge(@Stat.iSymbols@, @idIsExpr.sSymbols@, 1);
                         @i @Stat.node@ = NULL; /* TODO */
-                        @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.defined_vars@ = @idIsExpr.defined_vars@;
                         @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
@@ -229,14 +229,23 @@ Stat:             RETURN Expr
 idIsExpr:         ID '=' Expr ';'
                  @{
                         @i @Expr.symbols@ = @idIsExpr.iSymbols@;
-                        @i @idIsExpr.sSymbols@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, 0);
+                        @i @idIsExpr.sSymbols@ = table_add_symbol(new_table(), @ID.name@, SYMBOL_TYPE_VAR, 0, @idIsExpr.stack_offset@);
+                        @i @idIsExpr.defined_vars@ = 1;
+                        @i @idIsExpr.node@ = new_node(OP_Assign, new_named_leaf_value(OP_ID, @ID.name@, @idIsExpr.stack_offset@, -1), @Expr.node@);
+                        @reg @Expr.node@->reg = get_next_reg((char *)NULL, 0); @idIsExpr.node@->reg = @Expr.node@->reg;
+                        @codegen burm_label(@idIsExpr.node@); burm_reduce(@idIsExpr.node@, 1);
                  @}
 
-                | idIsExpr ID '=' Expr ';'
+                | ID '=' Expr ';' idIsExpr
                  @{
                         @i @Expr.symbols@ = @idIsExpr.iSymbols@;
                         @i @idIsExpr.1.iSymbols@ = @idIsExpr.0.iSymbols@;
-                        @i @idIsExpr.0.sSymbols@ = table_add_symbol(@idIsExpr.1.sSymbols@, @ID.name@, SYMBOL_TYPE_VAR, 1, 0);
+                        @i @idIsExpr.0.sSymbols@ = table_add_symbol(@idIsExpr.1.sSymbols@, @ID.name@, SYMBOL_TYPE_VAR, 1, @idIsExpr.stack_offset@);
+                        @i @idIsExpr.0.defined_vars@ = @idIsExpr.1.defined_vars@ + 1;
+                        @i @idIsExpr.1.stack_offset@ = @idIsExpr.0.stack_offset@ + 8;
+                        @i @idIsExpr.0.node@ = new_node(OP_Assign, new_named_leaf_value(OP_ID, @ID.name@, @idIsExpr.0.stack_offset@, -1), @Expr.node@);
+                        @reg @Expr.node@->reg = get_next_reg((char *)NULL, 0); @idIsExpr.0.node@->reg = @Expr.node@->reg;
+                        @codegen burm_label(@idIsExpr.node@); burm_reduce(@idIsExpr.node@, 1);
                  @}
                 ;
 
