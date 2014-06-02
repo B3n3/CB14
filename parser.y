@@ -131,7 +131,7 @@ Stats:            Stats Stat ';'
                         @i @Stats.1.if_in@ = @Stat.if_out@;
                         @i @Stats.if_out@ = @Stats.1.if_out@;
 
-                     /*   @codegen @@@@@ write_tree(@Stat.node@, 0); @@@@@ burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1); */
+                      /*  @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1); */
                    @}
 
                 |
@@ -151,6 +151,7 @@ Stat:             RETURN Expr
                         @i @Stat.if_out@ = @Stat.if_in@;
 
                         @reg @Stat.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = @Stat.node@->reg;
+                        @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);
                    @}
 
                 | COND END
@@ -158,6 +159,7 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
                 | COND exprThenStaEnd END
@@ -166,6 +168,7 @@ Stat:             RETURN Expr
                         @i @exprThenStaEnd.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
                 | LET IN Stats END
@@ -174,6 +177,7 @@ Stat:             RETURN Expr
                         @i @Stats.symbols@ = @Stat.iSymbols@;
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
                 | LET idIsExpr IN Stats END
@@ -183,6 +187,7 @@ Stat:             RETURN Expr
                         @i @Stats.symbols@ = table_merge(@Stat.iSymbols@, @idIsExpr.sSymbols@, 1);
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
                 | WITH Expr ':' ID DO Stats END
@@ -192,6 +197,7 @@ Stat:             RETURN Expr
                         @i @Stats.symbols@ = table_merge_as_type(@Stat.iSymbols@, table_check_lookup_struct_sublist(@Stat.iSymbols@, @ID.name@), SYMBOL_TYPE_VAR, 1);
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
                 | Lexpr '=' Expr
@@ -204,7 +210,7 @@ Stat:             RETURN Expr
                         @i @Stat.if_out@ = @Stat.if_in@;
 
                         @reg @Lexpr.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = get_next_reg(@Lexpr.node@->reg, 0); @Stat.node@->reg = @Expr.node@->reg;
-                        /* @codegen @@@!!! write_tree(@Stat.node@, 0); @@@!!!  burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);  */
+                        @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);
                    @}
 
                 | Term
@@ -214,6 +220,8 @@ Stat:             RETURN Expr
                         @i @Stat.defined_vars@ = 0; /* TODO */
                         /*@i @Stat.node@ = new_node(OP_Nop, (treenode*)NULL, (treenode*)NULL); */
                         @i @Stat.node@ = new_leaf(OP_NopEmpty);
+                        @i @Stat.if_out@ = @Stat.if_in@;
+                        @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);
                    @}
 
                 ;
@@ -236,22 +244,33 @@ exprThenStaEnd:   Expr THEN Stats END ';'
                  @{
                         @i @exprThenStaEnd.defined_vars@ = 0; /* TODO */
 
-                        @i @Expr.symbols@ = @exprThenStaEnd.in_symbols@;
-                        @i @Stats.symbols@ = @exprThenStaEnd.in_symbols@;
-                        @i @exprThenStaEnd.out_symbols@ = @exprThenStaEnd.in_symbols@;
+                        @i @Expr.symbols@ = @exprThenStaEnd.symbols@;
+                        @i @Stats.symbols@ = @exprThenStaEnd.symbols@;
                         @i @exprThenStaEnd.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
                         @i @Stats.if_in@ = @exprThenStaEnd.if_in@ + 1;
                         @i @exprThenStaEnd.if_out@ = @Stats.if_out@;
-                        @e Expr.jump_true : Stats.if_in; @Expr.jump_true@ = malloc(100); sprintf(@Expr.jump_true@, "if_then%i", @Stats.if_in@);
-                        @e Expr.jump_false : Stats.if_in; @Expr.jump_false@ = malloc(100); sprintf(@Expr.jump_false@, "if_end%i", @Stats.if_in@);
 
+                        @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
+                        @codegen @revorder(1) printf("\tjz .end%d\n", @exprThenStaEnd.if_in@);
                         @reg @Expr.node@->reg = get_next_reg((char *)NULL, 0);
-                        @codegen @revorder(1) printf("if_end%i:\n", @Stats.if_in@);
+                       /* @codegen burm_label(@Stats.node); burm_reduce(@Stats.node@, 1); */
+                        @codegen  printf("\tjmp .totalEnd%d\n.end%i:\n", 123, @exprThenStaEnd.if_in@);
                  @}
 
                 | exprThenStaEnd Expr THEN Stats END ';'
                  @{
                         @i @exprThenStaEnd.defined_vars@ = 0; /* TODO */
+
+                        @i @Expr.symbols@ = @exprThenStaEnd.symbols@;
+                        @i @Stats.symbols@ = @exprThenStaEnd.symbols@;
+                        @i @exprThenStaEnd.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
+                        @i @Stats.if_in@ = @exprThenStaEnd.1.if_out@ + 1;
+                        @i @exprThenStaEnd.if_out@ = @Stats.if_out@;
+                        @i @exprThenStaEnd.1.symbols@ = @exprThenStaEnd.0.symbols@;
+
+                        @codegen @revorder(1) printf("\tjz .end%d\n", @exprThenStaEnd.1.if_out@);
+                        @reg @Expr.node@->reg = get_next_reg((char *)NULL, 0);
+                        @codegen @revorder(1) printf(".end%i:\n", @exprThenStaEnd.1.if_out@);
                  @}
 
                 ;

@@ -22,6 +22,7 @@
 stat:   ret                                 # 0 #
 stat:   assign                              # 0 #
 stat:   OP_NopEmpty                         # 0 #
+stat:   expr                                # 0 #
 
 assign: OP_Assign(OP_ID, expr)              # 1 # if(bnode->kids[0]->param_index!=-1) { printf("\tmovq %%%s, %%%s\n", bnode->reg, get_param_reg(bnode->kids[0]->param_index)); } else { printf("\tmovq %%%s, %i(%%rsp)\n", bnode->reg, bnode->kids[0]->value); }
 assign:	OP_Assign(OP_Field(expr,OP_ID), expr) # 1 # printf("\tmovq %%%s, %li(%%%s)\n", bnode->kids[1]->reg, 8*bnode->kids[0]->value, bnode->kids[0]->reg);
