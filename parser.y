@@ -253,24 +253,26 @@ exprThenStaEnd:   Expr THEN Stats END ';'
                         @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
                         @codegen @revorder(1) printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @exprThenStaEnd.if_in@);
                         @reg @Expr.node@->reg = get_next_reg((char *)NULL, 0);
-                        @codegen  printf("\tjmp .totalEnd%d\n.end%i:\n", 123, @exprThenStaEnd.if_in@);
+                        /*@codegen  printf("\tjmp .totalEnd%d\n.end%i:\n", 123, @exprThenStaEnd.if_in@); */
+                        @codegen printf(".end%i:\n", @exprThenStaEnd.if_in@);
                  @}
 
-                | exprThenStaEnd Expr THEN Stats END ';'
+                | Expr THEN Stats END ';' exprThenStaEnd
                  @{
                         @i @exprThenStaEnd.defined_vars@ = 0; /* TODO */
 
                         @i @Expr.symbols@ = @exprThenStaEnd.symbols@;
                         @i @Stats.symbols@ = @exprThenStaEnd.symbols@;
                         @i @exprThenStaEnd.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
-                        @i @Stats.if_in@ = @exprThenStaEnd.1.if_out@ + 1;
-                        @i @exprThenStaEnd.if_out@ = @Stats.if_out@;
+                        @i @exprThenStaEnd.0.if_out@ = @exprThenStaEnd.1.if_out@;
                         @i @exprThenStaEnd.1.symbols@ = @exprThenStaEnd.0.symbols@;
 
-                        @codegen burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
-                        @codegen printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @exprThenStaEnd.1.if_out@);
+                        @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
+                        @codegen @revorder(1) printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @Stats.if_out@);
                         @reg @Expr.node@->reg = get_next_reg((char *)NULL, 0);
-                        @codegen printf("\tjmp .totalEnd%d\n.end%i:\n", 123, @exprThenStaEnd.1.if_out@);
+                        @codegen @e exprThenStaEnd.1.if_in : Stats.if_out ;
+                            printf("\tjmp .totalEnd%d\n.end%i:\n", 123, @Stats.if_out@);
+                            @exprThenStaEnd.1.if_in@ = @Stats.if_out@ + 1;
 
                      /* @codegen burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
                         @codegen printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @exprThenStaEnd.1.if_out@);
