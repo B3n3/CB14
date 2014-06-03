@@ -15,13 +15,13 @@ struct symbol_t *clone_table(struct symbol_t *table) {
     new_tablex=new_table();
     while(element!=(struct symbol_t *)NULL) {
         if(element->type==SYMBOL_TYPE_STRUCT) {
-            new_tablex=table_add_struct_with_fields(new_tablex,clone_table(element->sublist), NULL, element->identifier, element->type, 0, element->stack_offset);
+            new_tablex=table_add_struct_with_fields(new_tablex,clone_table(element->sublist), NULL, element->identifier, element->type, 0, NULL, element->stack_offset);
         } else {
            if(element->param_index!=-1) {
                new_tablex=table_add_param(new_tablex,element->identifier,element->param_index, 0);
            }
            else {
-               new_tablex=table_add_symbol(new_tablex,element->identifier,element->type,0,element->stack_offset);
+               new_tablex=table_add_symbol_with_startreg(new_tablex,element->identifier,element->type,0, element->start_reg,element->stack_offset);
            }
         }
         element=element->next;
@@ -31,10 +31,14 @@ struct symbol_t *clone_table(struct symbol_t *table) {
 }
 
 struct symbol_t *table_add_symbol(struct symbol_t *table, char *identifier, short type, short check, int stack_offset) {
-    return table_add_struct_with_fields(table, (struct symbol_t*) NULL, NULL, identifier, type, check, stack_offset);
+    return table_add_struct_with_fields(table, (struct symbol_t*) NULL, NULL, identifier, type, check, NULL, stack_offset);
 }
 
-struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct symbol_t* sublist, struct symbol_t* super_table, char *identifier, short type, short check, int stack_offset) {
+struct symbol_t *table_add_symbol_with_startreg(struct symbol_t *table, char *identifier, short type, short check, char* start_reg, int stack_offset) {
+    return table_add_struct_with_fields(table, (struct symbol_t*) NULL, NULL, identifier, type, check, start_reg, stack_offset);
+}
+
+struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct symbol_t* sublist, struct symbol_t* super_table, char *identifier, short type, short check, char* start_reg, int stack_offset) {
 
     struct symbol_t *element;
     struct symbol_t *new_element;
@@ -63,6 +67,8 @@ struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct sym
     new_element->next=(struct symbol_t *)NULL;
     new_element->identifier=strdup(identifier);
     new_element->type=type;
+    new_element->type=type;
+    new_element->start_reg=start_reg;
     new_element->stack_offset=stack_offset;
     new_element->param_index=-1;
 
@@ -72,7 +78,7 @@ struct symbol_t *table_add_struct_with_fields(struct symbol_t *table, struct sym
 
         sub_element=sublist;
         while(sub_element!=(struct symbol_t *)NULL) {
-            new_sublist=table_add_struct_with_fields(new_sublist, NULL, table, sub_element->identifier,SYMBOL_TYPE_FIELD,check, sub_element->stack_offset);
+            new_sublist=table_add_struct_with_fields(new_sublist, NULL, table, sub_element->identifier,SYMBOL_TYPE_FIELD,check, NULL, sub_element->stack_offset);
             sub_element=sub_element->next;
         }
         new_element->sublist = new_sublist;
@@ -184,11 +190,11 @@ struct symbol_t *table_merge(struct symbol_t *table, struct symbol_t *to_add, sh
     element=to_add;
     while(element!=(struct symbol_t *)NULL) {
         if(element->type==SYMBOL_TYPE_STRUCT) {
-            new_table=table_add_struct_with_fields(new_table,element->sublist, NULL, element->identifier,element->type,check, element->stack_offset);
+            new_table=table_add_struct_with_fields(new_table,element->sublist, NULL, element->identifier,element->type,check, NULL, element->stack_offset);
         } else if(element->param_index!=-1) {
 			new_table=table_add_param(new_table,element->identifier,element->param_index, check);
 		} else {
-            new_table=table_add_symbol(new_table,element->identifier,element->type,check, element->stack_offset);
+            new_table=table_add_symbol_with_startreg(new_table,element->identifier,element->type,check, element->start_reg, element->stack_offset);
         }
         element=element->next;
     }
@@ -196,13 +202,13 @@ struct symbol_t *table_merge(struct symbol_t *table, struct symbol_t *to_add, sh
     return new_table;
 }
 
-struct symbol_t *table_merge_as_type(struct symbol_t *table, struct symbol_t *to_add, short type, short check) {
+struct symbol_t *table_merge_as_type(struct symbol_t *table, struct symbol_t *to_add, char* start_reg, short type, short check) {
     struct symbol_t *element;
     struct symbol_t *new_table=clone_table(table);
 
     element=to_add;
     while(element!=(struct symbol_t *)NULL) {
-        new_table=table_add_symbol(new_table,element->identifier,type,check, element->stack_offset);
+        new_table=table_add_symbol_with_startreg(new_table,element->identifier,type,check, start_reg, element->stack_offset);
         element=element->next;
     }
 

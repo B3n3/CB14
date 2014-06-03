@@ -85,6 +85,7 @@ typedef treenode *treenodep;
 treenode *new_node(int op, treenode *left, treenode *right);
 treenode *new_node_value(int op, treenode *left, treenode *right, long value, int param);
 treenode *new_leaf(int op);
+treenode *new_leaf_with_reg(int op, char* reg);
 treenode *new_number_leaf(long value);
 treenode *new_named_leaf(int op, char *name);
 treenode *new_named_leaf_value(int op, char *name, long value, int param);

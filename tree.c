@@ -45,7 +45,7 @@ treenode *new_node_value(int op, treenode *left, treenode *right, long value, in
 /* new_leaf: create leaf - node with no children */
 treenode *new_leaf(int op) {
 	treenode *new=(treenode *)malloc(sizeof(treenode));
-	
+
 #ifdef DEBUG
 	printf("new_leaf: %i (%s)\n",op,rule_names[op]);
 #endif
@@ -58,12 +58,18 @@ treenode *new_leaf(int op) {
 	return new;
 }
 
+treenode *new_leaf_with_reg(int op, char* reg) {
+    treenode* new = new_leaf(op);
+    new->reg = reg;
+    return new;
+}
+
 /* new_named_leaf: create leaf with name (used for identifier or
  * value of number)
  */
 treenode *new_named_leaf(int op, char *name) {
 	treenode *new=(treenode *)malloc(sizeof(treenode));
-	
+
 #ifdef DEBUG
 	printf("new_named_leaf: %i (%s), %s\n",op,rule_names[op],name);
 #endif
@@ -81,7 +87,7 @@ treenode *new_named_leaf(int op, char *name) {
  */
 treenode *new_named_leaf_value(int op, char *name, long value, int param) {
 	treenode *new=(treenode *)malloc(sizeof(treenode));
-	
+
 #ifdef DEBUG
 	printf("new_named_leaf_value: %i (%s), %s, %li\n",op,rule_names[op],name,value);
 #endif
@@ -101,11 +107,11 @@ treenode *new_named_leaf_value(int op, char *name, long value, int param) {
  */
 treenode *new_named_node(int op, treenode *left, treenode *right, char *name) {
 	treenode *new=(treenode *)malloc(sizeof(treenode));
-	
+
 #ifdef DEBUG
 	printf("new_named_node: %i (%s), %s\n",op,rule_names[op],name);
 #endif
-	
+
 	new->kids[0]=left;
 	new->kids[1]=right;
 	new->op=op;

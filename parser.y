@@ -69,7 +69,7 @@ Structdef:        STRUCT ID ':' END
 
                 | STRUCT ID ':' StructIds END
                    @{
-                        @i @Structdef.structs@ = table_add_struct_with_fields(new_table(), @StructIds.fields@, NULL, @ID.name@, SYMBOL_TYPE_STRUCT, 1, @StructIds.offset@);
+                        @i @Structdef.structs@ = table_add_struct_with_fields(new_table(), @StructIds.fields@, NULL, @ID.name@, SYMBOL_TYPE_STRUCT, 1, NULL, @StructIds.offset@);
                         @i @StructIds.offset@ = 0;
                    @}
 
@@ -175,7 +175,7 @@ Stat:             RETURN Expr
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = @Stat.iSymbols@;
-                        @i @Stat.node@ = NULL; /* TODO */
+                        @i @Stat.node@ = NULL;
                         @i @Stat.defined_vars@ = 0;
                         @i @Stat.if_out@ = @Stat.if_in@;
                    @}
@@ -185,7 +185,7 @@ Stat:             RETURN Expr
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @idIsExpr.iSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = table_merge(@Stat.iSymbols@, @idIsExpr.sSymbols@, 1);
-                        @i @Stat.node@ = NULL; /* TODO */
+                        @i @Stat.node@ = NULL;
                         @i @Stat.defined_vars@ = @idIsExpr.defined_vars@ + @Stats.defined_vars@;
                         @i @Stats.stack_offset@ = @Stat.stack_offset@ + @idIsExpr.defined_vars@ * 8;
                         @i @Stat.if_out@ = @Stat.if_in@;
@@ -195,10 +195,12 @@ Stat:             RETURN Expr
                    @{
                         @i @Stat.sSymbols@ = @Stat.iSymbols@;
                         @i @Expr.symbols@ = @Stat.iSymbols@;
-                        @i @Stats.symbols@ = table_merge_as_type(@Stat.iSymbols@, table_check_lookup_struct_sublist(@Stat.iSymbols@, @ID.name@), SYMBOL_TYPE_VAR, 1);
-                        @i @Stat.node@ = NULL; /* TODO */
-                        @i @Stat.defined_vars@ = 0; /* TODO */
+                        @i @Stats.symbols@ = table_merge_as_type(@Stat.iSymbols@, table_check_lookup_struct_sublist(@Stat.iSymbols@, @ID.name@), get_next_reg(@Stat.node@->reg, 0), SYMBOL_TYPE_VAR, 1);
+                        @i @Stat.node@ = new_node(OP_Nop, @Expr.node@, (treenode *) NULL);
+                        @i @Stat.defined_vars@ = @Stats.defined_vars@;
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @reg @Expr.node@->reg = get_next_reg(@Stat.node@->reg, 0);
+                        @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
                    @}
 
                 | Lexpr '=' Expr
@@ -294,7 +296,9 @@ exprThenStaEnd:   Expr THEN Stats END ';'
 
 Lexpr:            ID
                   @{
-                        @i @Lexpr.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->stack_offset, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->param_index);
+                        @i @Lexpr.node@ = (table_lookup_sublists(@Lexpr.symbols@, @ID.name@) == (struct symbol_t*) NULL) ?
+                                       new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->stack_offset, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->param_index) :
+                                       new_node_value(OP_Field, new_leaf_with_reg(OP_NopEmpty, table_lookup(@Lexpr.symbols@, @ID.name@)->start_reg), new_named_leaf(OP_ID, @ID.name@), table_lookup_sublists(@Lexpr.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup_sublists(@Lexpr.symbols@, @ID.name@)->stack_offset, 0xCB);
                         @check check_variable(@Lexpr.symbols@, @ID.name@);
                   @}
 
@@ -439,9 +443,10 @@ Term:             '(' Expr ')'
 
                 | ID
                   @{
-                        @i @Term.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->stack_offset, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->param_index);
+                        @i @Term.node@ = (table_lookup_sublists(@Term.symbols@, @ID.name@) == (struct symbol_t*) NULL) ?
+                                       new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->stack_offset, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->param_index) :
+                                       new_node_value(OP_Field, new_leaf_with_reg(OP_NopEmpty, table_lookup(@Term.symbols@, @ID.name@)->start_reg), new_named_leaf(OP_ID, @ID.name@), table_lookup_sublists(@Term.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup_sublists(@Term.symbols@, @ID.name@)->stack_offset, 0xCB);
                         @i @Term.immediate@ = 0;
-
                         @check check_variable(@Term.symbols@, @ID.name@);
                   @}
 
