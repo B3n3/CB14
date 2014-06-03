@@ -21,8 +21,7 @@
 @attributes { struct symbol_t* pars; int num_pars; int all_pars; } ids
 @attributes { struct symbol_t* symbols; int defined_vars; int if_in; int if_out; } Funcdef
 @attributes { struct symbol_t* symbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stats exprThenStaEnd
-@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Term plusTerm multTerm orTerm
-@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr
+@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr Term plusTerm multTerm orTerm
 @attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr exprs
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } idIsExpr
