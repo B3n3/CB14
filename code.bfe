@@ -29,7 +29,7 @@ assign:	OP_Assign(OP_Field(expr,OP_ID), expr) # 1 # printf("\tmovq %%%s, %li(%%%
 
 ret:    OP_Return(expr)                     # 1 # move(bnode->reg, "rax"); ret();
 
-expr:   OP_ID                               # 1 # if(bnode->param_index!=-1) move(get_param_reg(bnode->param_index), bnode->reg);
+expr:   OP_ID                               # 1 # if(bnode->param_index!=-1) { move(get_param_reg(bnode->param_index), bnode->reg); } else { printf("\tmovq %i(%%rsp), %%%s\n", bnode->value, bnode->reg); }
 expr:   imm                                 # 1 # printf("\tmovq $%li, %%%s\n", bnode->value, bnode->reg);
 expr:   call                                # 0 #
 expr:   OP_Nop(expr)                        # 0 #

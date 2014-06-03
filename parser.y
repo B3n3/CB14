@@ -186,7 +186,8 @@ Stat:             RETURN Expr
                         @i @idIsExpr.iSymbols@ = @Stat.iSymbols@;
                         @i @Stats.symbols@ = table_merge(@Stat.iSymbols@, @idIsExpr.sSymbols@, 1);
                         @i @Stat.node@ = NULL; /* TODO */
-                        @i @Stat.defined_vars@ = @idIsExpr.defined_vars@;
+                        @i @Stat.defined_vars@ = @idIsExpr.defined_vars@ + @Stats.defined_vars@;
+                        @i @Stats.stack_offset@ = @Stat.stack_offset@ + @idIsExpr.defined_vars@ * 8;
                         @i @Stat.if_out@ = @Stat.if_in@;
                    @}
 
