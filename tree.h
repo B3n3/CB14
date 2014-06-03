@@ -65,6 +65,7 @@ typedef struct treenode {
     char *name;
     long value;
     char *reg;
+    char *with_start_reg;
     struct treenode *parent;
     int skip_reg;
     int param_index; /* -1 if not a parameter */

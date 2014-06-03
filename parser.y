@@ -82,7 +82,7 @@ StructIds:        ID
                 | ID StructIds
                    @{
                         @i @StructIds.0.fields@ = table_add_symbol(@StructIds.1.fields@, @ID.name@, SYMBOL_TYPE_VAR, 1, @StructIds.offset@);
-                        @i @StructIds.1.offset@ = @StructIds.offset@ + 1;
+                        @i @StructIds.1.offset@ = @StructIds.offset@ + 8;
                    @}
                 ;
 
@@ -300,7 +300,7 @@ Lexpr:            ID
 
                 | Term '.' ID
                    @{
-                        @i @Lexpr.node@ = new_node_value(OP_Field, @Term.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup(@Lexpr.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->stack_offset, -1);
+                        @i @Lexpr.node@ = new_node_value(OP_Field, @Term.node@, new_named_leaf(OP_ID, @ID.name@), table_lookup_sublists(@Lexpr.symbols@, @ID.name@)==(struct symbol_t *)NULL ? 0 : table_lookup_sublists(@Lexpr.symbols@, @ID.name@)->stack_offset, -1);
                         @check check_field(@Lexpr.symbols@, @ID.name@);
                         @reg @Term.node@->reg = @Lexpr.node@->reg; @Lexpr.node@->kids[1]->reg = get_next_reg(@Lexpr.node@->reg, 0);
                    @}
