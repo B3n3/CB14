@@ -5,13 +5,16 @@
         #include "symbol_table.h"
         #include "code_gen.h"
         #include "tree.h"
+
+        #define imm_prefix "$"
+        char *saved_reg;
 %}
 
 %token STRUCT END FUNC RETURN WITH DO LET IN COND THEN NOT OR ID GENERICS NUM
 %start Input
 
 @autoinh symbols stack_offset all_pars if_in
-@autosyn node defined_vars immediate if_out
+@autosyn node defined_vars immediate if_out has_call
 
 @attributes { char *name; } ID
 @attributes { long value; } NUM
@@ -20,10 +23,10 @@
 @attributes { struct symbol_t* fields; int offset; } StructIds
 @attributes { struct symbol_t* pars; int num_pars; int all_pars; } IdRule
 @attributes { struct symbol_t* symbols; int defined_vars; int if_in; int if_out; } Funcdef
-@attributes { struct symbol_t* symbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stats CondRule
-@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr Term PlusTerm MulTerm OrTerm
-@attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr FuncCallRule
-@attributes { struct symbol_t* inSymbols; struct symbol_t* outSymbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stat
+@attributes { struct symbol_t* symbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; int has_call; } Stats CondRule
+@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; int has_call; } Expr Term PlusTerm MulTerm OrTerm
+@attributes { struct symbol_t* symbols; struct treenode* node; int has_call; } Lexpr FuncCallRule
+@attributes { struct symbol_t* inSymbols; struct symbol_t* outSymbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; int has_call; } Stat
 @attributes { struct symbol_t* inSymbols; struct symbol_t* outSymbols; struct treenode* node; int defined_vars; int stack_offset; } ExprRule
 @attributes { int toggleNot; int toggleMinus; } NotMinRule
 
@@ -100,7 +103,7 @@ Funcdef :       FUNC ID '(' ')' Stats END
                         @i @Stats.symbols@ = @Funcdef.symbols@;
                         @i @Stats.stack_offset@ = 0;
 
-                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@);
+                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@, @Stats.has_call@, 0);
                  @}
         |       FUNC ID '(' IdRule ')' Stats END
                  @{
@@ -108,7 +111,7 @@ Funcdef :       FUNC ID '(' ')' Stats END
                         @i @Stats.stack_offset@ = 0;
                         @i @IdRule.all_pars@ = @IdRule.num_pars@;
 
-                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@);
+                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@, @Stats.has_call@, @IdRule.num_pars@);
                  @}
         ;
 
@@ -117,6 +120,7 @@ Stats   :       /* EPMTY */
                         @i @Stats.node@ = new_leaf(OP_NopEmpty); /* TODO */
                         @i @Stats.defined_vars@ = 0;
                         @i @Stats.if_out@ = @Stats.if_in@;
+                        @i @Stats.has_call@ = 0;
                    @}
         |       Stats Stat ';'
                  @{
@@ -128,6 +132,7 @@ Stats   :       /* EPMTY */
                         @i @Stat.if_in@ = @Stats.if_in@;
                         @i @Stats.1.if_in@ = @Stat.if_out@;
                         @i @Stats.if_out@ = @Stats.1.if_out@;
+                        @i @Stats.has_call@ = @Stat.has_call@ || @Stats.1.has_call@;
 
                       /*  @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1); */
                  @}
@@ -142,6 +147,7 @@ CondRule:       Expr THEN Stats END ';'
                         @i @CondRule.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
                         @i @Stats.if_in@ = @CondRule.if_in@ + 1;
                         @i @CondRule.if_out@ = @Stats.if_out@;
+                        @i @CondRule.has_call@ = @Expr.has_call@ || @Stats.has_call@;
 
                         @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
                         @codegen @revorder(1) printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @CondRule.if_in@);
@@ -158,6 +164,7 @@ CondRule:       Expr THEN Stats END ';'
                         @i @CondRule.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
                         @i @CondRule.0.if_out@ = @CondRule.1.if_out@;
                         @i @CondRule.1.symbols@ = @CondRule.0.symbols@;
+                        @i @CondRule.has_call@ = @Expr.has_call@ || @Stats.has_call@ || @CondRule.0.has_call@;
 
                         @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
                         @codegen @revorder(1) printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @Stats.if_out@);
@@ -216,6 +223,7 @@ Stat    :       RETURN Expr
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = 0;
                  @}
 
         |       COND CondRule END                /* COND { Expr THEN Stats END ’;’ } END */
@@ -225,6 +233,7 @@ Stat    :       RETURN Expr
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = @CondRule.has_call@;
                  @}
 
         |       LET IN Stats END        /* LET { ID ’=’ Expr ’;’ } IN Stats END */
@@ -255,6 +264,7 @@ Stat    :       RETURN Expr
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = @Expr.has_call@ || @Stats.has_call@;
                  @}
         |       Lexpr '=' Expr        /* Zuweisung */
                  @{
@@ -264,6 +274,7 @@ Stat    :       RETURN Expr
                         @i @Stat.node@ = new_node(OP_Assign, @Lexpr.node@, @Expr.node@);
                         @i @Stat.defined_vars@ = 0;
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = @Lexpr.has_call@ || @Expr.has_call@;
 
                         @reg @Lexpr.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = get_next_reg(@Lexpr.node@->reg, 0); @Stat.node@->reg = @Expr.node@->reg;
                         @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);
@@ -285,6 +296,7 @@ Stat    :       RETURN Expr
 Lexpr   :       ID                /* Schreibender Variablenzugriff */
                  @{
                         @i @Lexpr.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->stack_offset, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->param_index);
+                        @i @Lexpr.has_call@ = 0;
                         @check check_variable(@Lexpr.symbols@, @ID.name@);
                  @}
         |       Term '.' ID         /* Schreibender Feldzugriff */
@@ -324,6 +336,7 @@ PlusTerm:       '+' Term
                  @{
                         @i @PlusTerm.0.node@ = new_node(OP_Addition, @PlusTerm.1.node@, @Term.node@);
                         @i @PlusTerm.0.immediate@ = @Term.immediate@ && @PlusTerm.1.immediate@;
+                        @i @PlusTerm.has_call@ = @Term.has_call@ || @PlusTerm.1.has_call@;
                         @reg @PlusTerm.1.node@->reg = @PlusTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@PlusTerm.1.node@->reg, @PlusTerm.0.node@->skip_reg);
                  @}
         ;
@@ -335,6 +348,7 @@ MulTerm :       '*' Term
                  @{
                         @i @MulTerm.0.node@ = new_node(OP_Multiplication, @MulTerm.1.node@, @Term.node@);
                         @i @MulTerm.0.immediate@ = @Term.immediate@ && @MulTerm.1.immediate@;
+                        @i @MulTerm.has_call@ = @Term.has_call@ || @MulTerm.1.has_call@;
                         @reg @MulTerm.1.node@->reg = @MulTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@MulTerm.1.node@->reg, @MulTerm.0.node@->skip_reg);
                  @}
         ;
@@ -346,6 +360,7 @@ OrTerm  :       OR Term
                  @{
                         @i @OrTerm.0.node@ = new_node(OP_Disjunction, @OrTerm.1.node@, @Term.node@);
                         @i @OrTerm.0.immediate@ = @Term.immediate@ && @OrTerm.1.immediate@;
+                        @i @OrTerm.has_call@ = @Term.has_call@ || @OrTerm.1.has_call@;
                         @reg @OrTerm.1.node@->reg = @OrTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@OrTerm.1.node@->reg, @OrTerm.0.node@->skip_reg);
                  @}
         ;
@@ -368,24 +383,28 @@ Expr    :       Term
                  @{
                         @i @Expr.node@ = new_node(OP_Addition, @PlusTerm.node@, @Term.node@);
                         @i @Expr.immediate@ = @Term.immediate@ && @PlusTerm.immediate@;
+                        @i @Expr.has_call@ = @Term.has_call@ || @PlusTerm.has_call@;
                         @reg if(!@PlusTerm.immediate@) { @PlusTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@PlusTerm.node@->reg, @Expr.node@->skip_reg); @PlusTerm.node@->skip_reg = 1; } else { @Term.node@->reg = @Expr.node@->reg; @PlusTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
                  @}
         |       Term MulTerm         /* { '*' Term } */
                  @{
                         @i @Expr.node@ = new_node(OP_Multiplication, @MulTerm.node@, @Term.node@);
                         @i @Expr.immediate@ = @Term.immediate@ && @MulTerm.immediate@;
+                        @i @Expr.has_call@ = @Term.has_call@ || @MulTerm.has_call@;
                         @reg if(!@MulTerm.immediate@) { @MulTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@MulTerm.node@->reg, @Expr.node@->skip_reg); @MulTerm.node@->skip_reg = 1; } else { @Term.node@-> reg = @Expr.node@->reg; @MulTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
                  @}
         |       Term OrTerm         /* { OR Term } */
                  @{
                         @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @OrTerm.node@);
                         @i @Expr.immediate@ = 0;
+                        @i @Expr.has_call@ = @Term.has_call@ || @OrTerm.has_call@;
                         @reg if(!@OrTerm.immediate@) { @OrTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@OrTerm.node@->reg, @Expr.node@->skip_reg); @OrTerm.node@->skip_reg = 1; } else { @Term.node@->reg = @Expr.node@->reg; @OrTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
                  @}
         |       Term '>' Term
                  @{
                         @i @Expr.node@ = new_node(OP_Greater, @Term.node@, @Term.1.node@);
                         @i @Expr.immediate@ = 0;
+                        @i @Expr.has_call@ = @Term.has_call@ || @Term.1.has_call@;
                         @reg @Term.node@->reg = get_next_reg(@Expr.node@->reg, 0);
                         @reg @Term.1.node@->reg = get_next_reg(@Term.node@->reg, 0);
                  @}
@@ -393,15 +412,27 @@ Expr    :       Term
                  @{
                         @i @Expr.node@ = new_node(OP_NotEqual, @Term.node@, @Term.1.node@);
                         @i @Expr.immediate@ = 0;
+                        @i @Expr.has_call@ = @Term.has_call@ || @Term.1.has_call@;
                         @reg @Term.node@->reg = get_next_reg(@Expr.node@->reg, 0);
                         @reg @Term.1.node@->reg = get_next_reg(@Term.node@->reg, 0);
                  @}
         ;
 
-FuncCallRule:   Expr ','
-        |       FuncCallRule Expr ','
+FuncCallRule:   Expr
                  @{
-                        @i @FuncCallRule.node@ = new_node(OP_Exprs, @FuncCallRule.1.node@, @Expr.node@);
+                        @i @FuncCallRule.node@ = new_node(OP_Arg, @Expr.node@, (treenode *)NULL);
+                        @reg @Expr.node@->reg = @FuncCallRule.node@->reg;
+
+                        @codegen /* write_tree(@Expr.node@); */ /* burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1); do_call(function_name); */
+                 @}
+        |       Expr ',' FuncCallRule
+                 @{
+                        @i @FuncCallRule.node@ = new_node(OP_Exprs, new_node(OP_Arg, @Expr.node@, (treenode *)NULL), @FuncCallRule.1.node@);
+                        @i @FuncCallRule.has_call@ = @FuncCallRule.1.has_call@ || @Expr.has_call@;
+
+                        @reg @Expr.node@->reg = @FuncCallRule.node@->reg; @FuncCallRule.1.node@->reg = get_next_param_reg(@FuncCallRule.node@->reg); @FuncCallRule.node@->kids[0]->name = @FuncCallRule.node@->name; @FuncCallRule.1.node@->name = @FuncCallRule.node@->name;
+
+                        @codegen /* write_tree(@Expr.node@); */ /* burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1); */
                  @}
         ;
 
@@ -413,6 +444,7 @@ Term    :       '(' Expr ')'
                  @{
                         @i @Term.node@ = new_number_leaf(@NUM.value@);
                         @i @Term.immediate@ = 1;
+                        @i @Term.has_call@ = 0;
                  @}
         |       Term '.' ID                        /* Lesender Feldzugriff */
                  @{
@@ -426,32 +458,32 @@ Term    :       '(' Expr ')'
                  @{
                         @i @Term.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->stack_offset, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->param_index);
                         @i @Term.immediate@ = 0;
+                        @i @Term.has_call@ = 0;
 
                         @check check_variable(@Term.symbols@, @ID.name@);
                  @}
+        |       ID '(' ')'
+                 @{
+                        @i @Term.node@ = new_node(OP_CallNoParam, (treenode *)NULL, (treenode *)NULL);
+                        @i @Term.has_call@ = 1;
 
-        |       ID '(' ')'                        /* Leerer Funktionsaufruf */
-                 @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), NULL);
-                        @i @Term.0.immediate@ = 0;
-                 @}
-        |       ID '(' Expr ')'                        /* Leerer Funktionsaufruf */
-                 @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @Expr.node@);
-                        @i @Term.0.immediate@ = 0;
-                 @}
-        |       ID '(' FuncCallRule Expr ')'        /* Funktionsaufruf */
-                 @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), new_node(OP_Exprs, @FuncCallRule.node@, @Expr.node@));
-                        @i @Term.0.immediate@ = 0;
-                 @}
-        |       ID '(' FuncCallRule ')'                /* Funktionsaufruf */
-                 @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @FuncCallRule.node@);
-                        @i @Term.0.immediate@ = 0;
-                 @}
-        ;
+                        @codegen /* reg_return=@Term.node@->reg; do_call(@ID.name@); */
 
+                        @i @Term.0.immediate@ = 0;
+                 @}
+
+        |       ID '(' FuncCallRule ')'
+                 @{
+                        @i @Term.node@ = new_named_node(OP_Call, @FuncCallRule.node@, (treenode *)NULL, @ID.name@);
+                        @i @Term.has_call@ = 1;
+
+                        @reg saved_reg = @Term.node@->reg; @FuncCallRule.node@->reg = "rdi"; @FuncCallRule.node@->name=@Term.node@->name;
+                        @codegen /* reg_return=@Term.node@->reg; function_name = @ID.name@; prepare_call(function_name); */
+
+                        @i @Term.0.immediate@ = 0;
+                 @}
+
+                ;
 %%
 
 
