@@ -1,4 +1,4 @@
-all: codeb
+all: gesamt
 
 scanner.c: oxout.l
 	flex -oscanner.c oxout.l
@@ -6,8 +6,8 @@ scanner.c: oxout.l
 scanner.o: scanner.c parser.h symbol_table.h
 	gcc -g -c -ansi -pedantic scanner.c -D_GNU_SOURCE
 
-codeb: scanner.o parser.o symbol_table.o code_gen.o tree.o code.o
-	gcc -o codeb symbol_table.o scanner.o parser.o code_gen.o tree.o code.o -lfl
+gesamt: scanner.o parser.o symbol_table.o code_gen.o tree.o code.o
+	gcc -o gesamt symbol_table.o scanner.o parser.o code_gen.o tree.o code.o -lfl
 
 tree.o: tree.c tree.h
 	gcc -g -c -ansi -pedantic -Wall tree.c
@@ -34,5 +34,5 @@ code.c: code.bfe
 	bfe < code.bfe | iburg > code.c
 
 clean:
-	rm -f codeb scanner.o scanner.c parser.h parser.c parser.o oxout.y oxout.l symbol_table.o code_gen.o tree.o code.c code.o testcodeb* a.out
+	rm -f gesamt scanner.o scanner.c parser.h parser.c parser.o oxout.y oxout.l symbol_table.o code_gen.o tree.o code.c code.o testgesamt* a.out
 
