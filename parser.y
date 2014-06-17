@@ -5,13 +5,16 @@
         #include "symbol_table.h"
         #include "code_gen.h"
         #include "tree.h"
+
+        #define imm_prefix "$"
+        char *saved_reg;
 %}
 
 %start          Input
 %token          STRUCT END FUNC RETURN WITH DO LET IN COND THEN NOT OR ID NUM GENERICS
 
 @autoinh symbols stack_offset all_pars if_in
-@autosyn node defined_vars immediate if_out
+@autosyn node defined_vars immediate if_out has_call
 
 @attributes { char *name; } ID
 @attributes { long value; } NUM
@@ -20,10 +23,10 @@
 @attributes { struct symbol_t* fields; int offset; } StructIds
 @attributes { struct symbol_t* pars; int num_pars; int all_pars; } ids
 @attributes { struct symbol_t* symbols; int defined_vars; int if_in; int if_out; } Funcdef
-@attributes { struct symbol_t* symbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stats exprThenStaEnd
-@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; } Expr Term plusTerm multTerm orTerm
-@attributes { struct symbol_t* symbols; struct treenode* node; } Lexpr exprs
-@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; } Stat
+@attributes { struct symbol_t* symbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; int has_call; } Stats exprThenStaEnd
+@attributes { struct symbol_t* symbols; struct treenode* node; int immediate; int has_call; } Expr Term plusTerm multTerm orTerm
+@attributes { struct symbol_t* symbols; struct treenode* node; int has_call; } Lexpr exprs
+@attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; int if_in; int if_out; int has_call; } Stat
 @attributes { struct symbol_t* iSymbols; struct symbol_t* sSymbols; struct treenode* node; int defined_vars; int stack_offset; } idIsExpr
 @attributes { int toggleNot; int toggleMinus; } notTerm
 
@@ -91,7 +94,7 @@ Funcdef:          FUNC ID '(' ')' Stats END
                         @i @Stats.symbols@ = @Funcdef.symbols@;
                         @i @Stats.stack_offset@ = 0;
 
-                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@);
+                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@, @Stats.has_call@, 0);
                    @}
 
                 | FUNC ID '(' ids ')' Stats END
@@ -100,7 +103,7 @@ Funcdef:          FUNC ID '(' ')' Stats END
                         @i @Stats.stack_offset@ = 0;
                         @i @ids.all_pars@ = @ids.num_pars@;
 
-                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@);
+                        @codegen @revorder(1) function_header(@ID.name@, @Funcdef.defined_vars@, @Stats.has_call@, @ids.num_pars@);
                    @}
 
                 ;
@@ -129,6 +132,7 @@ Stats:            Stats Stat ';'
                         @i @Stat.if_in@ = @Stats.if_in@;
                         @i @Stats.1.if_in@ = @Stat.if_out@;
                         @i @Stats.if_out@ = @Stats.1.if_out@;
+                        @i @Stats.has_call@ = @Stat.has_call@ || @Stats.1.has_call@;
 
                       /*  @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1); */
                    @}
@@ -138,6 +142,7 @@ Stats:            Stats Stat ';'
                         @i @Stats.node@ = new_leaf(OP_NopEmpty); /* TODO */
                         @i @Stats.defined_vars@ = 0;
                         @i @Stats.if_out@ = @Stats.if_in@;
+                        @i @Stats.has_call@ = 0;
                    @}
                 ;
 
@@ -159,6 +164,7 @@ Stat:             RETURN Expr
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = 0;
                    @}
 
                 | COND exprThenStaEnd END
@@ -168,6 +174,7 @@ Stat:             RETURN Expr
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = @exprThenStaEnd.has_call@;
                    @}
 
                 | LET IN Stats END
@@ -198,6 +205,7 @@ Stat:             RETURN Expr
                         @i @Stat.node@ = NULL; /* TODO */
                         @i @Stat.defined_vars@ = 0; /* TODO */
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = @Expr.has_call@ || @Stats.has_call@;
                    @}
 
                 | Lexpr '=' Expr
@@ -208,6 +216,7 @@ Stat:             RETURN Expr
                         @i @Stat.node@ = new_node(OP_Assign, @Lexpr.node@, @Expr.node@);
                         @i @Stat.defined_vars@ = 0;
                         @i @Stat.if_out@ = @Stat.if_in@;
+                        @i @Stat.has_call@ = @Lexpr.has_call@ || @Expr.has_call@;
 
                         @reg @Lexpr.node@->reg = get_next_reg((char *)NULL, 0); @Expr.node@->reg = get_next_reg(@Lexpr.node@->reg, 0); @Stat.node@->reg = @Expr.node@->reg;
                         @codegen burm_label(@Stat.node@); burm_reduce(@Stat.node@, 1);
@@ -258,6 +267,7 @@ exprThenStaEnd:   Expr THEN Stats END ';'
                         @i @exprThenStaEnd.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
                         @i @Stats.if_in@ = @exprThenStaEnd.if_in@ + 1;
                         @i @exprThenStaEnd.if_out@ = @Stats.if_out@;
+                        @i @exprThenStaEnd.has_call@ = @Expr.has_call@ || @Stats.has_call@;
 
                         @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
                         @codegen @revorder(1) printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @exprThenStaEnd.if_in@);
@@ -275,6 +285,7 @@ exprThenStaEnd:   Expr THEN Stats END ';'
                         @i @exprThenStaEnd.node@ = new_node(OP_If, @Expr.node@, @Stats.node@);
                         @i @exprThenStaEnd.0.if_out@ = @exprThenStaEnd.1.if_out@;
                         @i @exprThenStaEnd.1.symbols@ = @exprThenStaEnd.0.symbols@;
+                        @i @exprThenStaEnd.has_call@ = @Expr.has_call@ || @Stats.has_call@ || @exprThenStaEnd.0.has_call@;
 
                         @codegen @revorder(1) burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1);
                         @codegen @revorder(1) printf("\tcmp $%d, %%%s \n\tjz .end%d\n", 0, @Expr.node@->reg, @Stats.if_out@);
@@ -294,6 +305,7 @@ exprThenStaEnd:   Expr THEN Stats END ';'
 Lexpr:            ID
                   @{
                         @i @Lexpr.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->stack_offset, (table_lookup(@Lexpr.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Lexpr.symbols@, @ID.name@)->param_index);
+                        @i @Lexpr.has_call@ = 0;
                         @check check_variable(@Lexpr.symbols@, @ID.name@);
                   @}
 
@@ -323,6 +335,7 @@ Expr:             Term
                   @{
                         @i @Expr.node@ = new_node(OP_Addition, @plusTerm.node@, @Term.node@);
                         @i @Expr.immediate@ = @Term.immediate@ && @plusTerm.immediate@;
+                        @i @Expr.has_call@ = @Term.has_call@ || @plusTerm.has_call@;
                         @reg if(!@plusTerm.immediate@) { @plusTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@plusTerm.node@->reg, @Expr.node@->skip_reg); @plusTerm.node@->skip_reg = 1; } else { @Term.node@->reg = @Expr.node@->reg; @plusTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
                   @}
 
@@ -330,6 +343,7 @@ Expr:             Term
                   @{
                         @i @Expr.node@ = new_node(OP_Multiplication, @multTerm.node@, @Term.node@);
                         @i @Expr.immediate@ = @Term.immediate@ && @multTerm.immediate@;
+                        @i @Expr.has_call@ = @Term.has_call@ || @multTerm.has_call@;
                         @reg if(!@multTerm.immediate@) { @multTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@multTerm.node@->reg, @Expr.node@->skip_reg); @multTerm.node@->skip_reg = 1; } else { @Term.node@-> reg = @Expr.node@->reg; @multTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
                   @}
 
@@ -337,6 +351,7 @@ Expr:             Term
                   @{
                         @i @Expr.node@ = new_node(OP_Disjunction, @Term.node@, @orTerm.node@);
                         @i @Expr.immediate@ = 0;
+                        @i @Expr.has_call@ = @Term.has_call@ || @orTerm.has_call@;
                         @reg if(!@orTerm.immediate@) { @orTerm.node@->reg = @Expr.node@->reg; @Term.node@->reg = get_next_reg(@orTerm.node@->reg, @Expr.node@->skip_reg); @orTerm.node@->skip_reg = 1; } else { @Term.node@->reg = @Expr.node@->reg; @orTerm.node@->reg = get_next_reg(@Term.node@->reg, @Expr.node@->skip_reg); }
                   @}
 
@@ -344,6 +359,7 @@ Expr:             Term
                   @{
                         @i @Expr.node@ = new_node(OP_Greater, @Term.node@, @Term.1.node@);
                         @i @Expr.immediate@ = 0;
+                        @i @Expr.has_call@ = @Term.has_call@ || @Term.1.has_call@;
                         @reg @Term.node@->reg = get_next_reg(@Expr.node@->reg, 0);
                         @reg @Term.1.node@->reg = get_next_reg(@Term.node@->reg, 0);
                   @}
@@ -352,6 +368,7 @@ Expr:             Term
                   @{
                         @i @Expr.node@ = new_node(OP_NotEqual, @Term.node@, @Term.1.node@);
                         @i @Expr.immediate@ = 0;
+                        @i @Expr.has_call@ = @Term.has_call@ || @Term.1.has_call@;
                         @reg @Term.node@->reg = get_next_reg(@Expr.node@->reg, 0);
                         @reg @Term.1.node@->reg = get_next_reg(@Term.node@->reg, 0);
                   @}
@@ -364,6 +381,7 @@ orTerm:           OR Term
                   @{
                         @i @orTerm.0.node@ = new_node(OP_Disjunction, @orTerm.1.node@, @Term.node@);
                         @i @orTerm.0.immediate@ = @Term.immediate@ && @orTerm.1.immediate@;
+                        @i @orTerm.has_call@ = @Term.has_call@ || @orTerm.1.has_call@;
                         @reg @orTerm.1.node@->reg = @orTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@orTerm.1.node@->reg, @orTerm.0.node@->skip_reg);
                   @}
 
@@ -376,6 +394,7 @@ multTerm:        '*' Term
                   @{
                         @i @multTerm.0.node@ = new_node(OP_Multiplication, @multTerm.1.node@, @Term.node@);
                         @i @multTerm.0.immediate@ = @Term.immediate@ && @multTerm.1.immediate@;
+                        @i @multTerm.has_call@ = @Term.has_call@ || @multTerm.1.has_call@;
                         @reg @multTerm.1.node@->reg = @multTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@multTerm.1.node@->reg, @multTerm.0.node@->skip_reg);
                   @}
 
@@ -388,6 +407,7 @@ plusTerm:         '+' Term
                   @{
                         @i @plusTerm.0.node@ = new_node(OP_Addition, @plusTerm.1.node@, @Term.node@);
                         @i @plusTerm.0.immediate@ = @Term.immediate@ && @plusTerm.1.immediate@;
+                        @i @plusTerm.has_call@ = @Term.has_call@ || @plusTerm.1.has_call@;
                         @reg @plusTerm.1.node@->reg = @plusTerm.0.node@->reg; @Term.node@->reg = get_next_reg(@plusTerm.1.node@->reg, @plusTerm.0.node@->skip_reg);
                   @}
 
@@ -426,6 +446,7 @@ Term:             '(' Expr ')'
                   @{
                         @i @Term.node@ = new_number_leaf(@NUM.value@);
                         @i @Term.immediate@ = 1;
+                        @i @Term.has_call@ = 0;
                   @}
 
                 | Term '.' ID
@@ -440,39 +461,50 @@ Term:             '(' Expr ')'
                   @{
                         @i @Term.node@ = new_named_leaf_value(OP_ID, @ID.name@, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->stack_offset, (table_lookup(@Term.symbols@, @ID.name@)==NULL) ? 0 : table_lookup(@Term.symbols@, @ID.name@)->param_index);
                         @i @Term.immediate@ = 0;
+                        @i @Term.has_call@ = 0;
 
                         @check check_variable(@Term.symbols@, @ID.name@);
                   @}
 
                 | ID '(' ')'
                   @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), NULL);
-                        @i @Term.0.immediate@ = 0;
-                  @}
+                        @i @Term.node@ = new_node(OP_CallNoParam, (treenode *)NULL, (treenode *)NULL);
+                        @i @Term.has_call@ = 1;
 
-                | ID '(' Expr ')'
-                  @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @Expr.node@);
+                        @codegen /* reg_return=@Term.node@->reg; do_call(@ID.name@); */
+
                         @i @Term.0.immediate@ = 0;
                   @}
 
                 | ID '(' exprs ')'
                   @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), @exprs.node@);
-                        @i @Term.0.immediate@ = 0;
-                  @}
+                        @i @Term.node@ = new_named_node(OP_Call, @exprs.node@, (treenode *)NULL, @ID.name@);
+                        @i @Term.has_call@ = 1;
 
-                | ID '(' exprs Expr ')'
-                  @{
-                        @i @Term.node@ = new_node(OP_Call, new_named_leaf(OP_ID, @ID.name@), new_node(OP_Exprs, @exprs.node@, @Expr.node@));
+                        @reg saved_reg = @Term.node@->reg; @exprs.node@->reg = "rdi"; @exprs.node@->name=@Term.node@->name;
+                        @codegen /* reg_return=@Term.node@->reg; function_name = @ID.name@; prepare_call(function_name); */
+
                         @i @Term.0.immediate@ = 0;
                   @}
 
                 ;
 
-exprs:            Expr ','
-                | exprs Expr ','
-                  @{ @i @exprs.node@ = new_node(OP_Exprs, @exprs.1.node@, @Expr.node@); @}
+exprs:            Expr
+                  @{
+                        @i @exprs.node@ = new_node(OP_Arg, @Expr.node@, (treenode *)NULL);
+                        @reg @Expr.node@->reg = @exprs.node@->reg;
+
+                        @codegen /* write_tree(@Expr.node@); */ /* burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1); do_call(function_name); */
+                  @}
+                | Expr ',' exprs
+                  @{
+                        @i @exprs.node@ = new_node(OP_Exprs, new_node(OP_Arg, @Expr.node@, (treenode *)NULL), @exprs.1.node@);
+                        @i @exprs.has_call@ = @exprs.1.has_call@ || @Expr.has_call@;
+
+                        @reg @Expr.node@->reg = @exprs.node@->reg; @exprs.1.node@->reg = get_next_param_reg(@exprs.node@->reg); @exprs.node@->kids[0]->name = @exprs.node@->name; @exprs.1.node@->name = @exprs.node@->name;
+
+                        @codegen /* write_tree(@Expr.node@); */ /* burm_label(@Expr.node@); burm_reduce(@Expr.node@, 1); */
+                  @}
                 ;
 %%
 

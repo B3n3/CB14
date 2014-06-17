@@ -15,7 +15,7 @@
 %}
 
 %start stat
-%term OP_Not=1 OP_Negation=2 OP_Addition=3 OP_Multiplication=4 OP_Disjunction=5 OP_Greater=6 OP_Equal=7 OP_ID=8 OP_Number=9 OP_Field=10 OP_Return=11 OP_Zero=12 OP_One=13 OP_Exprs=14 OP_Call=15 OP_NotEqual=16 OP_Nop=17 OP_MinusNot=18 OP_Assign=19 OP_NopEmpty=20 OP_If=21 OP_Stats=22
+%term OP_Not=1 OP_Negation=2 OP_Addition=3 OP_Multiplication=4 OP_Disjunction=5 OP_Greater=6 OP_Equal=7 OP_ID=8 OP_Number=9 OP_Field=10 OP_Return=11 OP_Zero=12 OP_One=13 OP_Exprs=14 OP_Call=15 OP_NotEqual=16 OP_Nop=17 OP_MinusNot=18 OP_Assign=19 OP_NopEmpty=20 OP_If=21 OP_Stats=22 OP_CallNoParam=23 OP_Arg=24
 
 %%
 
@@ -24,12 +24,12 @@ stat:   assign                              # 0 #
 stat:   OP_NopEmpty                         # 0 #
 stat:   expr                                # 0 #
 
-assign: OP_Assign(OP_ID, expr)              # 1 # if(bnode->kids[0]->param_index!=-1) { printf("\tmovq %%%s, %%%s\n", bnode->reg, get_param_reg(bnode->kids[0]->param_index)); } else { printf("\tmovq %%%s, %i(%%rsp)\n", bnode->reg, bnode->kids[0]->value); }
-assign:	OP_Assign(OP_Field(expr,OP_ID), expr) # 1 # printf("\tmovq %%%s, %li(%%%s)\n", bnode->kids[1]->reg, bnode->kids[0]->value, bnode->kids[0]->reg);
+assign:	OP_Assign(OP_ID, expr)			# 1 # if(bnode->kids[0]->param_index!=-1 && !call) { printf("\tmovq %%%s, %%%s /* x */\n", bnode->reg, get_param_reg(bnode->kids[0]->param_index)); } else if(bnode->kids[0]->param_index!=-1 && call) { printf("\tmovq %%%s, %i(%%rsp) /* y */\n", bnode->reg, 8*(variables-bnode->kids[0]->param_index)); } else { printf("\tmovq %%%s, %i(%%rsp) /* z */\n", bnode->reg, bnode->kids[0]->value); }
+assign: OP_Assign(OP_Field(expr,OP_ID), expr) # 1 # printf("\tmovq %%%s, %li(%%%s)\n", bnode->kids[1]->reg, bnode->kids[0]->value, bnode->kids[0]->reg);
 
 ret:    OP_Return(expr)                     # 1 # move(bnode->reg, "rax"); ret();
 
-expr:   OP_ID                               # 1 # if(bnode->param_index!=-1) { move(get_param_reg(bnode->param_index), bnode->reg); } else { printf("\tmovq %i(%%rsp), %%%s\n", bnode->value, bnode->reg); }
+expr:   OP_ID                               # 1 # if(bnode->param_index!=-1 && !call) { move(get_param_reg(bnode->param_index), bnode->reg); } else if(bnode->param_index!=-1 && call) { printf("\tmov %i(%%rsp), %%%s\n", 8*(variables-bnode->param_index), bnode->reg); } else { printf("\tmovq %i(%%rsp), %%%s\n", bnode->value, bnode->reg); }
 expr:   imm                                 # 1 # printf("\tmovq $%li, %%%s\n", bnode->value, bnode->reg);
 expr:   call                                # 0 #
 expr:   OP_Nop(expr)                        # 0 #
@@ -55,7 +55,10 @@ expr:   OP_Multiplication(expr,imm)         # 1 # if(bnode->kids[0]->op=OP_ID) {
 expr:   OP_Field(expr,OP_ID)                # 2 # printf("\tmovq %li(%%%s), %%%s\n", bnode->value, bnode->kids[0]->reg, bnode->reg);
 expr:   OP_Field(imm,OP_ID)                 # 1 # printf("\tmovq %li, %%%s\n", bnode->kids[0]->value+bnode->value, bnode->reg);
 
-call:   OP_Call(OP_ID,exprs)                # 0 # /* ignore at the moment */
+call:   OP_Call(exprs)                      # 0 # prepare_call(bnode->name, bnode->reg); /* reg_return=bnode->reg; */ do_call(bnode->name, bnode->reg);
+call:   OP_CallNoParam                      # 0 # prepare_call(bnode->name, bnode->reg); /* reg_return=bnode->reg; */ /* prepare_call(bnode->name); */ do_call(bnode->name, bnode->reg);
+
+exprs:  OP_Arg(expr)                        # 0 # /* reg_return=bnode->reg; function_name=bnode->name; */ /* prepare_call(bnode->name); */
 
 exprs:  expr                                # 0 #
 exprs:  OP_Exprs(exprs,expr)                # 0 #
